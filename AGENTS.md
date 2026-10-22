@@ -1,6 +1,16 @@
 # Frame dashboard
 
-A wall dashboard for one Android photo frame. The calendar is the first screen. The repo is `polo871209/photo-frame`. The frame hacking (root, debloat, boot screens, WebView) is recorded upstream in `docs/hy-s101-rk3326.md` of `wesbos/photo-frame-dashboard`, sent as [PR #235](https://github.com/wesbos/photo-frame-dashboard/pull/235). Device work goes there, and this repo holds only the dashboard.
+A wall dashboard for one Android photo frame. The calendar is the first screen. The repo is `polo871209/photo-frame`.
+
+## Read device/README.md before any work on the frame
+
+`device/README.md` records the frame itself: identity, partition map, how root works, every change made so far with its undo, and what is not done yet (WebView 138, the kiosk app). `device/` also holds the scripts that did the work.
+
+- Run ADB through mise (`mise exec -- adb`). `mise.toml` pins it.
+- Reads on the frame are fine. Ask the owner before every write to the frame, flash or settings, even if the same write was approved before.
+- Before a flash write, make sure that a verified backup exists, that the target has the expected hash, and that the undo is written down. Read the result back.
+- After any change on the frame, add it to `device/README.md` with its undo. Keep serial numbers out of the repo, and keep backups in `backups/`, which git ignores.
+- The public record of the same work is [PR #235](https://github.com/wesbos/photo-frame-dashboard/pull/235) to `wesbos/photo-frame-dashboard`. If you learn something that other owners of this board need, add it to that PR's `docs/hy-s101-rk3326.md` on the `hy-s101-record` branch of `polo871209/photo-frame-dashboard`, and ask the owner before you push.
 
 ## The target device sets every limit
 
