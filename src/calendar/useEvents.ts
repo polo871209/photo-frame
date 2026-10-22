@@ -1,11 +1,12 @@
 import { useEffect, useState } from "preact/hooks";
-import type { EventsResponse } from "../../shared/events";
+import type { CalendarInfo, EventsResponse } from "../../shared/events";
 import { toOccurrences, type Occurrence } from "./model";
 
 const REFRESH_MS = 5 * 60_000;
 
 export interface EventsState {
   occurrences: Occurrence[];
+  calendars: CalendarInfo[];
   source?: EventsResponse["source"];
   failed: string[];
   error?: string;
@@ -14,6 +15,7 @@ export interface EventsState {
 export function useEvents(start: Date, end: Date): EventsState {
   const [state, setState] = useState<EventsState>({
     occurrences: [],
+    calendars: [],
     failed: [],
   });
   const [refresh, setRefresh] = useState(0);
@@ -37,6 +39,7 @@ export function useEvents(start: Date, end: Date): EventsState {
       .then((body) =>
         setState({
           occurrences: toOccurrences(body, start, end),
+          calendars: body.calendars,
           source: body.source,
           failed: body.failed,
         }),

@@ -23,10 +23,5 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "wrangler": "^4.151.3"
-  },
-  "allowScripts": {
-    "esbuild@0.28.2": true,
-    "workerd@1.20261012.1": true,
-    "workerd@1.20261019.1": true
   }
 }

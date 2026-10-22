@@ -29,7 +29,6 @@ export function sameDay(a: Date, b: Date): boolean {
   );
 }
 
-/** Parses `YYYY-MM-DD` as local midnight, so all-day events stay on their calendar date. */
 export function parseLocalDate(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1);

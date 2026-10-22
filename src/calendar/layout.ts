@@ -9,10 +9,6 @@ export interface PlacedBlock {
   columns: number;
 }
 
-/**
- * Lays out the timed events of one day the way Google Calendar does: events that overlap share
- * the width, each in its own column.
- */
 export function placeTimed(
   occurrences: Occurrence[],
   day: Date,
@@ -59,9 +55,7 @@ export function placeTimed(
 
 export interface AllDayBar {
   occurrence: Occurrence;
-  /** Index of the first visible day, inclusive. */
   from: number;
-  /** Index after the last visible day. */
   to: number;
   row: number;
   continuesBefore: boolean;
@@ -98,7 +92,6 @@ export function packAllDay(
   return bars;
 }
 
-/** All-day events, and timed events of 24 hours or more, go in the all-day row. */
 export function spansDays(occurrence: Occurrence): boolean {
   return occurrence.allDay || +occurrence.end - +occurrence.start >= DAY_MS;
 }

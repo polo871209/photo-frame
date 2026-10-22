@@ -102,10 +102,6 @@ const TEMPLATES: Template[] = [
 
 const DAY_MS = 864e5;
 
-/**
- * Builds sample events for `[from, to)`. `from` is the client's local midnight, so hour offsets
- * from it land on local clock times.
- */
 export function sampleEvents(from: Date, to: Date): CalendarEvent[] {
   const events: CalendarEvent[] = [];
   for (let dayStart = +from; dayStart < +to; dayStart += DAY_MS) {

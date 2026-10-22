@@ -4,7 +4,7 @@ A wall dashboard for one Android photo frame. The calendar is the first screen. 
 
 ## Read device/README.md before any work on the frame
 
-`device/README.md` records the frame itself: identity, partition map, how root works, every change made so far with its undo, and what is not done yet (WebView 138, the kiosk app). `device/` also holds the scripts that did the work.
+`device/README.md` records the frame itself: identity, partition map, how root works, every change made so far with its undo, and what is not done yet (WebView 138, more swap). `device/` also holds the scripts that did the work.
 
 - Run ADB through mise (`mise exec -- adb`). `mise.toml` pins it.
 - Reads on the frame are fine. Ask the owner before every write to the frame, flash or settings, even if the same write was approved before.
@@ -33,9 +33,9 @@ The frame's system time zone is `Asia/Kuala_Lumpur` (`getprop persist.sys.timezo
 
 ## Layout of the code
 
-- `worker/`: the Cloudflare Worker. It serves `/api/*` (`run_worker_first` in `wrangler.jsonc`), and the static assets serve everything else.
+- `worker/`: the Cloudflare Worker. It runs first on every path (`run_worker_first: true` in `wrangler.jsonc`), checks the key, serves `/api/*` itself and passes everything else to the static assets.
 - `shared/`: types used by both the worker and the client. Change the API contract here first.
-- `src/calendar/`: the calendar screen. `views.ts` is the one list of views and owns each view's range, step and title. `layout.ts` places overlapping timed events in columns and packs all-day bars into rows.
+- `src/calendar/`: the calendar screen. `views.ts` is the one list of views and owns each view's range, step and title. `prefs.ts` keeps each device's hidden calendars and color choices in `localStorage`, and `SettingsSheet.tsx` edits them. `layout.ts` places overlapping timed events in columns and packs all-day bars into rows.
 - `src/styles/`: `tokens.css` (colors, fonts, sizes), `base.css` (controls shared by all screens), and one file per screen.
 
 New screens (tasks, weather, photos) go in `src/<screen>/` with their own CSS file, and their data routes go under `/api/<screen>` in the worker.
@@ -45,6 +45,7 @@ New screens (tasks, weather, photos) go in `src/<screen>/` with their own CSS fi
 The worker reads Google Calendar through each calendar's secret iCal address. There is no OAuth and no Google token on the frame.
 
 - The `CALENDARS` variable is a JSON array of `{name, url, color}`. In development it lives in `.dev.vars`, and in production it is a Wrangler secret. If `CALENDARS` is unset, the worker returns sample events from `worker/sample.ts`, and the header shows "Sample events".
+- Every path needs the key, as `?key=` or as the `frame_key` cookie that a valid `?key=` sets. Otherwise the worker answers 404, and the same happens when `FRAME_KEY` is unset. `worker/index.ts` checks it before it serves assets through `env.ASSETS`. The production key is in `.mise.toml` under `[env]` (git ignores it). Never print it, log it or commit it.
 - The iCal addresses are secrets, because anyone with one can read the calendar. Keep them out of commits, logs, screenshots and error messages. `failed` in the response lists calendar names only.
 - Feeds are cached for 300 s at the edge, and the client refetches every 5 min. Expansion stops at 5000 occurrences for each feed, and a request can cover at most 70 days.
 - Recurrence goes through `ical.js`. Keep recurrence exceptions (`RECURRENCE-ID`), `EXDATE` and `STATUS:CANCELLED` working. Test a change in `worker/ics.ts` against a feed that has all three.
@@ -60,17 +61,17 @@ The look follows the `dashboard/` folder in `wesbos/photo-frame-dashboard`: warm
 
 ## Make sure that a change works before you commit
 
-Run commands through mise, for example `mise exec -- npm run check`. The npm scripts are in `package.json`.
+Run commands through mise, for example `mise exec -- pnpm check`. The package manager is pnpm, and the scripts are in `package.json`.
 
-1. Run `npm run check`. It type-checks the client and the worker with separate configurations.
-2. Run `npm run build`.
-3. Start `npm run dev`, then run `npm run screenshots -- http://localhost:5173/`. It opens each view in Google Chrome at 1280×800 and writes PNGs to `screenshots/`, which git ignores. It exits non-zero on any page error. Look at every PNG.
+1. Run `pnpm check`. It type-checks the client and the worker with separate configurations.
+2. Run `pnpm build`.
+3. Make sure that `.dev.vars` has `FRAME_KEY=local-dev`. Start `pnpm dev`, then run `pnpm screenshots "http://localhost:5173/?key=local-dev"`. It opens each view in Google Chrome at 1280×800 and writes PNGs to `screenshots/`, which git ignores. It exits non-zero on any page error. Look at every PNG.
 4. If you changed CSS or a dependency, run `grep -oE "#[0-9a-fA-F]{4}\b|#[0-9a-fA-F]{8}\b" dist/client/assets/*.css`. It must print nothing.
 
 Chrome on the Mac is newer than WebView 106. A screenshot that passes does not prove that the frame renders the page. If a change uses a CSS or JS feature newer than Chrome 106, check it on caniuse.com or on the frame itself.
 
 ## Deploy only when the owner asks
 
-`npm run deploy` builds and publishes to Cloudflare, and the frame gets the new version when the page reloads. Ask the owner before you deploy. Before you change `CALENDARS` in production with `wrangler secret put`, ask too.
+`pnpm run deploy` builds and publishes to Cloudflare at `https://photoframe.lochingpo.com`, and the frame gets the new version when the page reloads. Ask the owner before you deploy. Before you change `CALENDARS` in production with `wrangler secret put`, ask too.
 
-After you change `wrangler.jsonc`, run `npm run types` to regenerate `worker-configuration.d.ts`.
+After you change `wrangler.jsonc`, run `pnpm types` to regenerate `worker-configuration.d.ts`.

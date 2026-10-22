@@ -3,8 +3,8 @@ import type { CalendarEvent } from "../shared/events";
 
 const MAX_OCCURRENCES_PER_EVENT = 5000;
 const DAY_MS = 864e5;
+const UNKNOWN_ZONE_SLACK_MS = DAY_MS;
 
-/** Expands an iCalendar feed into the occurrences that overlap `[from, to)`. */
 export function expandIcs(
   text: string,
   calendarId: string,
@@ -80,14 +80,15 @@ function toOccurrence(
   };
 }
 
-// The Worker does not know the viewer's time zone, so all-day dates get a day of slack on each
-// side. The client drops anything outside its own local range.
 function overlaps(event: CalendarEvent, from: Date, to: Date): boolean {
-  if (!event.allDay)
-    return new Date(event.start) < to && new Date(event.end) > from;
+  if (event.allDay) return allDayMayOverlap(event, from, to);
+  return new Date(event.start) < to && new Date(event.end) > from;
+}
+
+function allDayMayOverlap(event: CalendarEvent, from: Date, to: Date): boolean {
   return (
-    Date.parse(event.start) < +to + DAY_MS &&
-    Date.parse(event.end) > +from - DAY_MS
+    Date.parse(event.start) < +to + UNKNOWN_ZONE_SLACK_MS &&
+    Date.parse(event.end) > +from - UNKNOWN_ZONE_SLACK_MS
   );
 }
 

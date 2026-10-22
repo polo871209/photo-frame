@@ -23,7 +23,6 @@ const SCHEDULE_DAYS = 28;
 
 export interface VisibleRange {
   start: Date;
-  /** Exclusive. */
   end: Date;
   days: Date[];
 }

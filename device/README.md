@@ -2,7 +2,7 @@
 
 This is the reference for the one frame this dashboard runs on. It records what the frame is, every change made to it on 2026-10-22, the commands that did each change, and how to undo each one. The public, shorter version is [`docs/hy-s101-rk3326.md`](https://github.com/polo871209/photo-frame-dashboard/blob/hy-s101-record/docs/hy-s101-rk3326.md) in [wesbos/photo-frame-dashboard PR #235](https://github.com/wesbos/photo-frame-dashboard/pull/235).
 
-The frame now runs plain Android 8.1 with no vendor apps and no Frameo. Its Home app is Rootless Pixel Launcher, and it shows black screens while it boots. WebView is still the stock 106.
+The frame now runs plain Android 8.1 with no vendor apps and no Frameo. Its Home app is the Home HQ kiosk, which shows the dashboard, and it shows black screens while it boots. WebView is still the stock 106.
 
 ## Rules for any work on the frame
 
@@ -266,6 +266,50 @@ Undo: write the stock sectors back the same way. Cut `dd bs=512 skip=213 count=4
 
 To set the time zone, open Android Settings → System → Date & time, turn off automatic time zone, and select Kuala Lumpur. Check it with `getprop persist.sys.timezone`, which prints `Asia/Kuala_Lumpur`. The dashboard follows it (see `AGENTS.md`). Without Wi-Fi, the frame has no NTP, so the clock drifts.
 
+## 7. Home HQ kiosk as Home
+
+Home HQ is the kiosk app from `dashboard/kiosk` in `wesbos/photo-frame-dashboard`. It shows `https://photoframe.lochingpo.com/?key=<FRAME_KEY>` full screen in WebView 106, retries every 5 s when the page fails to load, and opens native controls on a two-finger hold of 1.5 s. Its README lists every feature.
+
+### Build
+
+The APK was built on 2026-10-22 from upstream commit `f1e0820`, with the newest stable tools. Build-tools 37.0.0 and platform 37.2 come from `sdkmanager`, and JDK Temurin 27 comes from mise. Upstream's `build.sh` hard-codes platform 34, so the build uses a copy with the platform path changed:
+
+```sh
+git clone https://github.com/wesbos/photo-frame-dashboard.git && cd photo-frame-dashboard
+git checkout f1e0820
+sdkmanager --sdk_root=$ANDROID_HOME "build-tools;37.0.0" "platforms;android-37.2"
+sed 's#platforms/android-34/#platforms/android-37.2/#' dashboard/kiosk/build.sh > dashboard/kiosk/build-latest.sh
+BUILD_TOOLS=$ANDROID_HOME/build-tools/37.0.0 bash dashboard/kiosk/build-latest.sh
+```
+
+The result is `com.wesbos.homehq` 1.1 (version code 2), minSdk 23, targetSdk 28, signed with APK Signature Scheme v2 and v3. Its SHA-256 was `c1633c68785b9d479543fbff976ad3c6af5b488a26920ff738cf655d3e8c02de`. targetSdk stays at 28 because a higher target changes nothing on Android 8.1, and upstream says that 30 and higher need manifest changes.
+
+The APK is signed with `~/.android/debug.keystore` on the Mac that built it. An update with `adb install -r` must be signed with the same key. With another key, uninstall first.
+
+### Install
+
+```sh
+mise exec -- adb install homehq.apk
+mise exec -- sh -c 'adb shell am start -n com.wesbos.homehq/.MainActivity --es url "https://photoframe.lochingpo.com/?key=$FRAME_KEY"'
+mise exec -- adb shell am start -n com.wesbos.homehq/.MainActivity --ez home true
+mise exec -- adb shell cmd package set-home-activity --user 0 com.wesbos.homehq/.Home
+```
+
+`FRAME_KEY` comes from `.mise.toml` (see `README.md`). Home HQ stores the URL in its app data, which anyone with ADB and root can read. Its log leaves out the query.
+
+Wait 30 s before you reboot, because Android saves the Home choice a few seconds later. Then make sure that it is saved:
+
+```sh
+mise exec -- adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME   # com.wesbos.homehq/.Home
+mise exec -- adb shell "su 1000 grep -A1 '<preferred-activities' /data/system/users/0/package-restrictions.xml"
+```
+
+If the kiosk shows "Can't reach the dashboard" and logcat shows `HomeHQ: Load failed (net::ERR_NAME_NOT_RESOLVED)`, the router or Android has cached a "no such host" answer. Cloudflare's negative TTL for `lochingpo.com` is 1800 s, and `ndc resolver clearnetdns` does not clear Android's copy, so wait for it to expire. To prevent it, do not look up a new hostname before the deploy that creates it.
+
+To reach Android Settings or Pixel Launcher from the kiosk, hold two fingers on the screen for 1.5 s, then tap **Android settings** or **Open launcher**.
+
+Undo: `cmd package set-home-activity --user 0 amirz.rootless.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity`, then `am start -n com.wesbos.homehq/.MainActivity --ez home false`, then `adb uninstall com.wesbos.homehq`.
+
 ## Not done yet
 
 ### WebView 138
@@ -289,7 +333,3 @@ Measure memory and page load on 106 first, so you can tell whether 138 is better
 ### More swap
 
 `zram0` is 360 MB. Making it larger needs `CAP_SYS_ADMIN`, which this `su` does not have.
-
-### A kiosk app
-
-Nothing opens the dashboard on the frame yet. The upstream repo's `dashboard/kiosk` app is the candidate. It needs JDK 17 and Android build-tools 34 to build.

@@ -3,8 +3,11 @@ import { expandIcs } from "./ics";
 import { sampleEvents, SAMPLE_CALENDARS } from "./sample";
 
 interface Env {
+  ASSETS: Fetcher;
   /** JSON array of `{ "name", "url", "color" }`. `url` is a Google Calendar secret iCal address. */
   CALENDARS?: string;
+  /** Shared secret. Every request must send it as `?key=` or in the `frame_key` cookie, or it gets 404. */
+  FRAME_KEY?: string;
 }
 
 interface CalendarConfig extends CalendarInfo {
@@ -13,41 +16,87 @@ interface CalendarConfig extends CalendarInfo {
 
 const MAX_RANGE_DAYS = 70;
 const ICS_CACHE_SECONDS = 300;
+const KEY_COOKIE = "frame_key";
+const COOKIE_MAX_AGE_SECONDS = 400 * 86400;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== "/api/events")
-      return new Response("Not found", { status: 404 });
+    const queryKey = url.searchParams.get("key");
+    const sentKey = queryKey ?? readCookie(request, KEY_COOKIE) ?? "";
+    if (!(await isFrameKey(sentKey, env))) return notFound();
 
-    const from = new Date(url.searchParams.get("from") ?? "");
-    const to = new Date(url.searchParams.get("to") ?? "");
-    if (
-      Number.isNaN(+from) ||
-      Number.isNaN(+to) ||
-      to <= from ||
-      +to - +from > MAX_RANGE_DAYS * 864e5
-    ) {
-      return Response.json(
-        {
-          error: `from and to must be ISO dates at most ${MAX_RANGE_DAYS} days apart`,
-        },
-        { status: 400 },
-      );
-    }
+    const response = url.pathname.startsWith("/api/")
+      ? await handleApi(url, env)
+      : await env.ASSETS.fetch(request);
+    if (queryKey === null) return response;
 
-    const calendars = readCalendars(env);
-    const body: EventsResponse = calendars.length
-      ? await googleEvents(calendars, from, to)
-      : {
-          source: "sample",
-          calendars: SAMPLE_CALENDARS,
-          events: sampleEvents(from, to),
-          failed: [],
-        };
-    return Response.json(body, { headers: { "Cache-Control": "no-store" } });
+    const withCookie = new Response(response.body, response);
+    withCookie.headers.append(
+      "Set-Cookie",
+      `${KEY_COOKIE}=${queryKey}; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Strict`,
+    );
+    return withCookie;
   },
 } satisfies ExportedHandler<Env>;
+
+function notFound(): Response {
+  return new Response("Not found", {
+    status: 404,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
+function readCookie(request: Request, name: string): string | undefined {
+  return request.headers
+    .get("Cookie")
+    ?.split(";")
+    .map((pair) => pair.trim().split("="))
+    .find(([key]) => key === name)?.[1];
+}
+
+async function isFrameKey(sentKey: string, env: Env): Promise<boolean> {
+  if (!env.FRAME_KEY) return false;
+  return crypto.subtle.timingSafeEqual(
+    await sha256(sentKey),
+    await sha256(env.FRAME_KEY),
+  );
+}
+
+function sha256(value: string): Promise<ArrayBuffer> {
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+}
+
+async function handleApi(url: URL, env: Env): Promise<Response> {
+  if (url.pathname !== "/api/events") return notFound();
+
+  const from = new Date(url.searchParams.get("from") ?? "");
+  const to = new Date(url.searchParams.get("to") ?? "");
+  if (
+    Number.isNaN(+from) ||
+    Number.isNaN(+to) ||
+    to <= from ||
+    +to - +from > MAX_RANGE_DAYS * 864e5
+  ) {
+    return Response.json(
+      {
+        error: `from and to must be ISO dates at most ${MAX_RANGE_DAYS} days apart`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const calendars = readCalendars(env);
+  const body: EventsResponse = calendars.length
+    ? await googleEvents(calendars, from, to)
+    : {
+        source: "sample",
+        calendars: SAMPLE_CALENDARS,
+        events: sampleEvents(from, to),
+        failed: [],
+      };
+  return Response.json(body, { headers: { "Cache-Control": "no-store" } });
+}
 
 function readCalendars(env: Env): CalendarConfig[] {
   if (!env.CALENDARS) return [];

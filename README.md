@@ -6,11 +6,30 @@ A wall dashboard for a 1280×800 Android photo frame. The first screen is a Goog
 
 ```sh
 mise install
-mise exec -- npm install
-mise exec -- npm run dev
+mise exec -- pnpm install
+mise exec -- pnpm dev
 ```
 
-Open <http://localhost:5173>. Without a calendar configuration, the worker returns sample events and the header shows "Sample events".
+Create `.dev.vars` (git ignores it) with a local key, then open <http://localhost:5173/?key=local-dev>:
+
+```sh
+printf 'FRAME_KEY=local-dev\n' > .dev.vars
+```
+
+Without a calendar configuration, the worker returns sample events and the header shows "Sample events".
+
+## Only the frame can read the calendar
+
+The worker runs first on every path (`run_worker_first: true`). A request without the key gets 404, so the page, its assets and the API all look absent. The kiosk opens `https://photoframe.lochingpo.com/?key=<FRAME_KEY>`. A valid `?key=` sets the HttpOnly cookie `frame_key`, and the page's own asset and API requests send that cookie. If `FRAME_KEY` is not set, every request gets 404.
+
+The production key is 32 random bytes in base64url. It lives in the Wrangler secret `FRAME_KEY`, in the owner's secret manager, and in `.mise.toml` (git ignores it) under `[env]`. Never commit it. To make a new key and send it to Cloudflare:
+
+```sh
+openssl rand 32 | base64 | tr '+/' '-_' | tr -d '=\n'   # put the output in .mise.toml as FRAME_KEY
+mise exec -- sh -c 'printf %s "$FRAME_KEY" | pnpm exec wrangler secret put FRAME_KEY'
+```
+
+After a new key, give the kiosk the new URL (see `device/README.md`).
 
 ## Connect Google Calendar
 
@@ -27,20 +46,24 @@ The worker reads each calendar's secret iCal address. Nobody needs to sign in, a
 4. For production, store the same JSON as a secret:
 
    ```sh
-   mise exec -- npx wrangler secret put CALENDARS
+   mise exec -- pnpm exec wrangler secret put CALENDARS
    ```
 
 Do not commit the iCal addresses. Anyone with the address can read the calendar.
+
+To hide a calendar or change its color, tap the sliders button at the top right of the frame. Each device stores these choices in its own `localStorage`, keyed by calendar name. The color in `CALENDARS` is the default, and its swatch is the first one in each row.
 
 If a feed fails, the other calendars still show and the header names the calendar that did not load. The worker caches each feed for 5 minutes, and the client refreshes every 5 minutes.
 
 ## Check and deploy
 
 ```sh
-mise exec -- npm run check    # type-checks the client and the worker
-mise exec -- npm run build
-mise exec -- npm run deploy
+mise exec -- pnpm check    # type-checks the client and the worker
+mise exec -- pnpm build
+mise exec -- pnpm run deploy
 ```
+
+The worker serves <https://photoframe.lochingpo.com> (`routes` in `wrangler.jsonc`). Use `pnpm run deploy`, because `pnpm deploy` is a pnpm command and does not run the script.
 
 ## Rules for changes
 

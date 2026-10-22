@@ -6,6 +6,7 @@ const PATHS = {
   clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7v5l3 2",
   calendar: "M4 6h16v15H4z M4 10h16 M8 3v4 M16 3v4",
   notes: "M5 4h14v16H5z M8 9h8 M8 13h8 M8 17h5",
+  sliders: "M4 7h9 M17 7h3 M4 17h3 M11 17h9 M15 5v4 M9 15v4",
 };
 
 export type IconName = keyof typeof PATHS;

@@ -5,7 +5,9 @@ import { useNow } from "../lib/useNow";
 import { EventSheet } from "./EventSheet";
 import type { Occurrence } from "./model";
 import { MonthGrid } from "./MonthGrid";
+import { useCalendarPrefs, withPrefs } from "./prefs";
 import { Schedule } from "./Schedule";
+import { SettingsSheet } from "./SettingsSheet";
 import { TimeGrid } from "./TimeGrid";
 import { useEvents } from "./useEvents";
 import {
@@ -27,10 +29,13 @@ export function Calendar() {
   const [view, setView] = useState<ViewId>(DEFAULT_VIEW);
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [selected, setSelected] = useState<Occurrence | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [prefs, setPrefs] = useCalendarPrefs();
   const range = useMemo(() => visibleRange(view, anchor), [view, +anchor]);
-  const { occurrences, source, failed, error } = useEvents(
-    range.start,
-    range.end,
+  const events = useEvents(range.start, range.end);
+  const occurrences = useMemo(
+    () => withPrefs(events.occurrences, prefs),
+    [events.occurrences, prefs],
   );
 
   const lastTouch = useRef(Date.now());
@@ -39,8 +44,15 @@ export function Calendar() {
 
   useEffect(() => {
     if (Date.now() - lastTouch.current < IDLE_RESET_MS) return;
-    if (view === DEFAULT_VIEW && sameDay(anchor, now) && !selected) return;
+    if (
+      view === DEFAULT_VIEW &&
+      sameDay(anchor, now) &&
+      !selected &&
+      !settingsOpen
+    )
+      return;
     setSelected(null);
+    setSettingsOpen(false);
     setView(DEFAULT_VIEW);
     setAnchor(startOfDay(now));
   }, [now]);
@@ -84,7 +96,11 @@ export function Calendar() {
           <Icon name="right" />
         </button>
         <h1 class="cal-title serif">{title(view, anchor, range)}</h1>
-        <Status source={source} failed={failed} error={error} />
+        <Status
+          source={events.source}
+          failed={events.failed}
+          error={events.error}
+        />
         <div class="seg">
           {VIEWS.map(({ id, label }) => (
             <button
@@ -96,6 +112,13 @@ export function Calendar() {
             </button>
           ))}
         </div>
+        <button
+          class="icon-btn"
+          aria-label="Settings"
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Icon name="sliders" />
+        </button>
       </header>
 
       <div
@@ -150,6 +173,14 @@ export function Calendar() {
 
       {selected && (
         <EventSheet occurrence={selected} onClose={() => setSelected(null)} />
+      )}
+      {settingsOpen && (
+        <SettingsSheet
+          calendars={events.calendars}
+          prefs={prefs}
+          onChange={setPrefs}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
     </div>
   );

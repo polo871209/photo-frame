@@ -41,7 +41,6 @@ export function onDay(occurrences: Occurrence[], day: Date): Occurrence[] {
   return occurrences.filter((o) => o.start < dayEnd && o.end > dayStart);
 }
 
-/** CSS custom properties for one calendar colour: `--c` and its RGB triplet `--c-rgb`. */
 export function colorVars(hex: string): string {
   const value = parseInt(hex.replace("#", ""), 16);
   const rgb = `${(value >> 16) & 255} ${(value >> 8) & 255} ${value & 255}`;

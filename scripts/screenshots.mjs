@@ -31,9 +31,13 @@ await page.click('.seg button:text-is("Week")');
 await page.locator(".ev").first().click();
 await page.waitForSelector(".sheet");
 await page.screenshot({ path: `${outDir}EventSheet.png` });
+await page.click(".sheet-x");
+await page.click('.icon-btn[aria-label="Settings"]');
+await page.waitForSelector(".set-cal");
+await page.screenshot({ path: `${outDir}Settings.png` });
 await browser.close();
 
-console.log(`Wrote ${views.length + 1} screenshots to ${outDir}`);
+console.log(`Wrote ${views.length + 2} screenshots to ${outDir}`);
 if (errors.length) {
   console.error(errors.join("\n"));
   process.exit(1);
