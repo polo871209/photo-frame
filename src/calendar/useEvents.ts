@@ -1,0 +1,52 @@
+import { useEffect, useState } from "preact/hooks";
+import type { EventsResponse } from "../../shared/events";
+import { toOccurrences, type Occurrence } from "./model";
+
+const REFRESH_MS = 5 * 60_000;
+
+export interface EventsState {
+  occurrences: Occurrence[];
+  source?: EventsResponse["source"];
+  failed: string[];
+  error?: string;
+}
+
+export function useEvents(start: Date, end: Date): EventsState {
+  const [state, setState] = useState<EventsState>({
+    occurrences: [],
+    failed: [],
+  });
+  const [refresh, setRefresh] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setRefresh((n) => n + 1), REFRESH_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      from: start.toISOString(),
+      to: end.toISOString(),
+    });
+    fetch(`/api/events?${query}`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json() as Promise<EventsResponse>;
+      })
+      .then((body) =>
+        setState({
+          occurrences: toOccurrences(body, start, end),
+          source: body.source,
+          failed: body.failed,
+        }),
+      )
+      .catch((error: Error) => {
+        if (controller.signal.aborted) return;
+        setState((previous) => ({ ...previous, error: error.message }));
+      });
+    return () => controller.abort();
+  }, [+start, +end, refresh]);
+
+  return state;
+}

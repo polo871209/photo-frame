@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1280, initial-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#F2EEE6" />
+    <title>Frame</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      setTimeout(function () {
+        if (!document.getElementById("app").hasChildNodes()) location.reload();
+      }, 10000);
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

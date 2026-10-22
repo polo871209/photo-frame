@@ -1,0 +1,19 @@
+:root {
+  --paper: #F2EEE6;
+  --paper-2: #E8E2D5;
+  --card: #FBF9F4;
+  --ink: #111111;
+  --ink-2: #3B3934;
+  --mute: #7A756B;
+  --line: #D6CFC0;
+  --alert: #E5261E;
+
+  --c: var(--ink);
+  --c-rgb: 17 17 17;
+
+  --sans: 'Archivo Variable', 'Roboto Condensed', 'Roboto', sans-serif;
+  --serif: 'Instrument Serif', 'Noto Serif', Georgia, serif;
+
+  --gutter: 64px;
+  --tap: 52px;
+}
