@@ -44,6 +44,10 @@ export function Calendar() {
 
   useEffect(() => {
     if (Date.now() - lastTouch.current < IDLE_RESET_MS) return;
+    if (events.buildChanged) {
+      location.reload();
+      return;
+    }
     if (
       view === DEFAULT_VIEW &&
       sameDay(anchor, now) &&

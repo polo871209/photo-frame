@@ -2,14 +2,14 @@
 
 A wall dashboard for one Android photo frame. The calendar is the first screen. The repo is `polo871209/photo-frame`.
 
+Run every command through mise, for example `mise exec -- pnpm check` or `mise exec -- adb devices`. `mise.toml` pins the tools.
+
 ## Read device/README.md before any work on the frame
 
-`device/README.md` records the frame itself: identity, partition map, how root works, every change made so far with its undo, and what is not done yet (WebView 138, more swap). `device/` also holds the scripts that did the work.
+`device/README.md` records the frame: identity, partition map, how root works, every change so far with its undo, and what is not done yet. Its "Rules for any work on the frame" bind every write. `device/` also holds the scripts that did the work.
 
-- Run ADB through mise (`mise exec -- adb`). `mise.toml` pins it.
-- Reads on the frame are fine. Ask the owner before every write to the frame, flash or settings, even if the same write was approved before. The kiosk reload and update in [Deploy after every change](#deploy-after-every-change) need no question.
-- Before a flash write, make sure that a verified backup exists, that the target has the expected hash, and that the undo is written down. Read the result back.
-- After any change on the frame, add it to `device/README.md` with its undo. Keep serial numbers out of the repo, and keep backups in `backups/`, which git ignores.
+- Reads on the frame are fine. Ask the owner before every write to the frame, flash or settings, even if the same write was approved before. The kiosk APK install in [Deploy after every change](#deploy-after-every-change) needs no question.
+- After any change on the frame, add it to `device/README.md` with its undo.
 - The public record of the same work is [PR #235](https://github.com/wesbos/photo-frame-dashboard/pull/235) to `wesbos/photo-frame-dashboard`. If you learn something that other owners of this board need, add it to that PR's `docs/hy-s101-rk3326.md` on the `hy-s101-record` branch of `polo871209/photo-frame-dashboard`, and ask the owner before you push.
 
 ## The target device sets every limit
@@ -19,7 +19,7 @@ The frame is an HY-S101 (Rockchip RK3326, Android 8.1 Go, about 976 MB RAM, 32-b
 - **Browser:** Android System WebView 106. `vite.config.ts` sets `build.target: chrome106` and `cssTarget: chrome61`. Keep `cssTarget` at `chrome61`, because WebView 106 rejects the 4- and 8-digit hex colors that newer targets let the minifier write.
 - **CSS:** write flat CSS. Use `rgb(var(--c-rgb) / .12)` for tints. Nesting, `color-mix()`, `oklch()` and `dvh` units do not work in WebView 106.
 - **Screen:** 1280×800 at 160 dpi, touch only. `src/App.tsx` draws a fixed 1280×800 `.stage` and scales it to the window, so lay out in fixed pixels for that size. Hover states never show. Tap targets are at least `--tap` (52px).
-- **Memory and CPU:** the frame is slow. Keep the bundle small (now 26 KB JS, 10 KB gzipped), add a dependency only when it removes real work, and avoid animations that run all the time.
+- **Memory and CPU:** the frame is slow. Keep the bundle small (now 29 KB JS, 11 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time.
 - **Unattended:** nobody presses reload. Every fetch must fail soft and retry on the next refresh. `index.html` reloads the page if the bundle did not mount within 10 s.
 
 ## Time zone follows the system
@@ -45,7 +45,7 @@ New screens (tasks, weather, photos) go in `src/<screen>/` with their own CSS fi
 The worker reads Google Calendar through each calendar's secret iCal address. There is no OAuth and no Google token on the frame.
 
 - The `CALENDARS` variable is a JSON array of `{name, url, color}`. In development it lives in `.dev.vars`, and in production it is a Wrangler secret. If `CALENDARS` is unset, the worker returns sample events from `worker/sample.ts`, and the header shows "Sample events".
-- Every path needs the key, as `?key=` or as the `frame_key` cookie that a valid `?key=` sets. Otherwise the worker answers 404, and the same happens when `FRAME_KEY` is unset. `worker/index.ts` checks it before it serves assets through `env.ASSETS`. The production key is in `.mise.toml` under `[env]` (git ignores it). Never print it, log it or commit it.
+- Every path needs the key, as `?key=` or as the `frame_key` cookie that a valid `?key=` sets. Otherwise the worker answers 404, and the same happens when `FRAME_KEY` is unset. `worker/index.ts` checks it before it serves assets through `env.ASSETS`. The production key is in `.mise.toml` under `[env]` (git ignores it). Never print it, log it or commit it. The kiosk saves the key in its URL, so after a key change, set the URL again as section 7 of `device/README.md` describes, or the frame shows 404.
 - The iCal addresses are secrets, because anyone with one can read the calendar. Keep them out of commits, logs, screenshots and error messages. `failed` in the response lists calendar names only.
 - Feeds are cached for 30 s at the edge, and the client refetches every 30 s. Expansion stops at 5000 occurrences for each feed, and a request can cover at most 70 days.
 - Recurrence goes through `ical.js`. Keep recurrence exceptions (`RECURRENCE-ID`), `EXDATE` and `STATUS:CANCELLED` working. Test a change in `worker/ics.ts` against a feed that has all three.
@@ -61,9 +61,7 @@ The look follows the `dashboard/` folder in `wesbos/photo-frame-dashboard`: warm
 
 ## Make sure that a change works before you commit
 
-Run commands through mise, for example `mise exec -- pnpm check`. The package manager is pnpm, and the scripts are in `package.json`.
-
-1. Run `pnpm check`. It type-checks the client and the worker with separate configurations.
+1. Run `pnpm check`.
 2. Run `pnpm build`.
 3. Make sure that `.dev.vars` has `FRAME_KEY=local-dev`. Start `pnpm dev`, then run `pnpm screenshots "http://localhost:5173/?key=local-dev"`. It opens each view in Google Chrome at 1280×800 and writes PNGs to `screenshots/`, which git ignores. It exits non-zero on any page error. Look at every PNG.
 4. If you changed CSS or a dependency, run `grep -oE "#[0-9a-fA-F]{4}\b|#[0-9a-fA-F]{8}\b" dist/client/assets/*.css`. It must print nothing.
@@ -72,10 +70,19 @@ Chrome on the Mac is newer than WebView 106. A screenshot that passes does not p
 
 ## Deploy after every change
 
-When a change passes the checks above, run `mise exec -- pnpm run deploy`. It builds and publishes to Cloudflare at `https://photoframe.lochingpo.com`. The frame runs the new version only after the kiosk page reloads, so reload it next:
+When a change passes the checks above, run `pnpm run deploy` without asking the owner. It publishes the worker and its assets to `https://photoframe.lochingpo.com` as one version.
 
-- If `mise exec -- adb devices` lists the frame, run `mise exec -- adb shell am force-stop com.wesbos.homehq`, then `mise exec -- adb shell am start -n com.wesbos.homehq/.MainActivity`. The kiosk opens the saved URL. If the change is to the kiosk APK itself, install it first with `adb install -r`, as section 7 of `device/README.md` describes.
-- If the frame is not on ADB, tell the owner that the frame still runs the old version. The owner can hold two fingers on the frame for 1.5 s and tap **Reload dashboard**.
+The frame reloads itself after a deploy, with no ADB and no hand:
+
+1. `vite.config.ts` puts one build ID (the build time) into both the client and the worker.
+2. Every `/api/events` response carries the worker's ID in the `Frame-Build` header (`shared/build.ts`).
+3. If that ID differs from the page's own, `Calendar.tsx` reloads the page once nobody has touched the frame for 3 min (`IDLE_RESET_MS`).
+
+An untouched frame runs the new version within about 1 min of the deploy. Keep this chain working in every change, because without it a deploy reaches the frame only by hand.
+
+The worker serves every file under `/assets/` with `Cache-Control: private, max-age=31536000, immutable`, so the frame fetches only the files whose content hash changed. Add files there only through imports that Vite hashes, never through `public/assets/`.
+
+If the change is to the kiosk APK itself and the frame is on ADB, install the APK as section 7 of `device/README.md` describes. If the frame is not on ADB, tell the owner that the frame still runs the old APK.
 
 Ask the owner before you change `CALENDARS` in production with `wrangler secret put`.
 

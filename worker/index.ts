@@ -1,3 +1,4 @@
+import { BUILD_HEADER, BUILD_ID } from "../shared/build";
 import type { CalendarInfo, EventsResponse } from "../shared/events";
 import { expandIcs } from "./ics";
 import { sampleEvents, SAMPLE_CALENDARS } from "./sample";
@@ -27,7 +28,7 @@ export default {
 
     const response = url.pathname.startsWith("/api/")
       ? await handleApi(url, env)
-      : await env.ASSETS.fetch(request);
+      : await serveAsset(request, url, env);
     if (queryKey === null) return response;
 
     const withCookie = new Response(response.body, response);
@@ -38,6 +39,23 @@ export default {
     return withCookie;
   },
 } satisfies ExportedHandler<Env>;
+
+async function serveAsset(
+  request: Request,
+  url: URL,
+  env: Env,
+): Promise<Response> {
+  const response = await env.ASSETS.fetch(request);
+  const hashed = url.pathname.startsWith("/assets/");
+  // A 304 replaces the cached headers (RFC 9111 section 4.3.4), so files cached before stop revalidating too.
+  if (!hashed || ![200, 304].includes(response.status)) return response;
+  const immutable = new Response(response.body, response);
+  immutable.headers.set(
+    "Cache-Control",
+    "private, max-age=31536000, immutable",
+  );
+  return immutable;
+}
 
 function notFound(): Response {
   return new Response("Not found", {
@@ -94,7 +112,9 @@ async function handleApi(url: URL, env: Env): Promise<Response> {
         events: sampleEvents(from, to),
         failed: [],
       };
-  return Response.json(body, { headers: { "Cache-Control": "no-store" } });
+  return Response.json(body, {
+    headers: { "Cache-Control": "no-store", [BUILD_HEADER]: BUILD_ID },
+  });
 }
 
 function readCalendars(env: Env): CalendarConfig[] {

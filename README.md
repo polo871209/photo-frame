@@ -63,7 +63,9 @@ mise exec -- pnpm build
 mise exec -- pnpm run deploy
 ```
 
-The worker serves <https://photoframe.lochingpo.com> (`routes` in `wrangler.jsonc`). Use `pnpm run deploy`, because `pnpm deploy` is a pnpm command and does not run the script.
+The worker serves <https://photoframe.lochingpo.com> (`routes` in `wrangler.jsonc`). Use `pnpm run deploy`, because `pnpm deploy` is a pnpm command and does not run the script. The deploy runs `pnpm check` first.
+
+The frame picks up a deploy by itself. It reloads the page once the server reports a new build and nobody has touched the screen for 3 minutes. `AGENTS.md` describes how.
 
 ## Rules for changes
 

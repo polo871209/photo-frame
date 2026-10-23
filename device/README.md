@@ -1,6 +1,6 @@
 # HY-S101 frame: how it was opened up
 
-This is the reference for the one frame this dashboard runs on. It records what the frame is, every change made to it on 2026-10-22, the commands that did each change, and how to undo each one. The public, shorter version is [`docs/hy-s101-rk3326.md`](https://github.com/polo871209/photo-frame-dashboard/blob/hy-s101-record/docs/hy-s101-rk3326.md) in [wesbos/photo-frame-dashboard PR #235](https://github.com/wesbos/photo-frame-dashboard/pull/235).
+This is the reference for the one frame this dashboard runs on. It records what the frame is, every change made to it on 2026-10-22 and 2026-10-23, the commands that did each change, and how to undo each one. The public, shorter version is [`docs/hy-s101-rk3326.md`](https://github.com/polo871209/photo-frame-dashboard/blob/hy-s101-record/docs/hy-s101-rk3326.md) in [wesbos/photo-frame-dashboard PR #235](https://github.com/wesbos/photo-frame-dashboard/pull/235).
 
 The frame now runs plain Android 8.1 with no vendor apps and no Frameo. Its Home app is the Home HQ kiosk, which shows the dashboard, and it shows black screens while it boots. WebView is still the stock 106.
 
@@ -36,24 +36,24 @@ The board and partition map are the same as the Akimart ZN-DP1002 in the upstrea
 
 From `/sys/block/rknand0/rknand0p<N>/start`, `size` and `uevent`, in 512-byte sectors.
 
-| Node | Name     | Start   | Sectors  | Notes                                                                        |
-| ---- | -------- | ------- | -------- | ---------------------------------------------------------------------------- |
-| p1   | uboot    | 16384   | 8192     |                                                                              |
-| p2   | trust    | 24576   | 8192     |                                                                              |
-| p3   | misc     | 32768   | 8192     |                                                                              |
-| p4   | resource | 40960   | 32768    | Boot logos and device tree. Changed, see [the boot logo](#5-black-boot-logo) |
-| p5   | kernel   | 73728   | 65536    |                                                                              |
-| p6   | boot     | 139264  | 65536    |                                                                              |
-| p7   | recovery | 204800  | 262144   |                                                                              |
-| p8   | backup   | 466944  | 393216   |                                                                              |
-| p9   | security | 860160  | 8192     |                                                                              |
-| p10  | cache    | 868352  | 786432   |                                                                              |
-| p11  | system   | 1654784 | 3932160  | ext4, mounted read-only                                                      |
-| p12  | metadata | 5586944 | 32768    |                                                                              |
-| p13  | vendor   | 5619712 | 786432   | ext4, read-only                                                              |
-| p14  | oem      | 6406144 | 262144   | ext4, read-only                                                              |
-| p15  | frp      | 6668288 | 1024     | Owned by `system` (uid 1000)                                                 |
-| p16  | userdata | 6669312 | 53885888 | `/data`                                                                      |
+| Node | Name     | Start   | Sectors  | Notes                                                                             |
+| ---- | -------- | ------- | -------- | --------------------------------------------------------------------------------- |
+| p1   | uboot    | 16384   | 8192     |                                                                                   |
+| p2   | trust    | 24576   | 8192     |                                                                                   |
+| p3   | misc     | 32768   | 8192     |                                                                                   |
+| p4   | resource | 40960   | 32768    | Boot logos and device tree. Changed, see [the boot logo](#5-black-boot-logo)      |
+| p5   | kernel   | 73728   | 65536    |                                                                                   |
+| p6   | boot     | 139264  | 65536    |                                                                                   |
+| p7   | recovery | 204800  | 262144   |                                                                                   |
+| p8   | backup   | 466944  | 393216   |                                                                                   |
+| p9   | security | 860160  | 8192     |                                                                                   |
+| p10  | cache    | 868352  | 786432   |                                                                                   |
+| p11  | system   | 1654784 | 3932160  | ext4, mounted read-only. Changed, see [the boot animation](#5-black-boot-screens) |
+| p12  | metadata | 5586944 | 32768    |                                                                                   |
+| p13  | vendor   | 5619712 | 786432   | ext4, read-only                                                                   |
+| p14  | oem      | 6406144 | 262144   | ext4, read-only                                                                   |
+| p15  | frp      | 6668288 | 1024     | Owned by `system` (uid 1000)                                                      |
+| p16  | userdata | 6669312 | 53885888 | `/data`                                                                           |
 
 ## Tools
 
@@ -191,27 +191,62 @@ The logs and Frameo leftovers were deleted once, with no undo: `logcat -b all -c
 
 While it starts, the frame shows the boot logo from the bootloader and kernel, then Android's boot animation. Both showed the Frameo logo.
 
-### Boot animation: a video in /data, no flash write
+### Boot animation: a black zip in the stock zip's blocks
 
-Rockchip's `libbootanimation.so` plays `/data/local/bootanimation.ts` instead of `/system/media/bootanimation.zip` when `persist.sys.bootvideo.enable` is 1.
+The stock boot animation is `/system/media/bootanimation.zip`, the Frameo logo on white (`870 432 15`, four parts). Rockchip's `libbootanimation.so` plays `/oem/media/bootanimation.zip` or `/system/media/bootanimation.zip` if either exists. It plays `/data/local/bootanimation.ts` only if neither zip exists and `persist.sys.bootvideo.enable` is `true`. A video in `/data` therefore cannot replace the stock zip, and `/system` is read-only.
 
-```sh
-ffmpeg -f lavfi -i color=c=black:s=1280x800:r=25 -t 1 \
-  -c:v libx264 -profile:v baseline -pix_fmt yuv420p -f mpegts bootanimation.ts
-mise exec -- adb push bootanimation.ts /data/local/tmp/
-mise exec -- adb shell su 0 cp /data/local/tmp/bootanimation.ts /data/local/bootanimation.ts
-mise exec -- adb shell su 0 chmod 0644 /data/local/bootanimation.ts
-mise exec -- adb shell rm /data/local/tmp/bootanimation.ts
-mise exec -- adb shell su 0 setprop persist.sys.bootvideo.enable 1
-```
+On 2026-10-22 a black video in `/data/local/bootanimation.ts` with `persist.sys.bootvideo.enable` set to `1` was tried, and the Frameo animation still played. On 2026-10-23 both were removed with `su 0 setprop persist.sys.bootvideo.enable 0` and `su 0 rm /data/local/bootanimation.ts`.
 
-The file on the frame is 1 s of black H.264, Constrained Baseline, 1280×800 at 25 fps, in MPEG-TS.
+The fix writes a black zip into the data blocks of the stock zip. The zip fills 91 contiguous 4 KiB blocks from block 297,532 of `system`. The black zip has the stock size of 369,653 bytes, so no ext4 metadata changes. ext4 does not checksum file data, and `/system` is mounted straight from `rknand0p11` with no dm-verity device, so the change survives a reboot.
 
-Undo: `su 0 setprop persist.sys.bootvideo.enable 0` and `su 0 rm /data/local/bootanimation.ts`.
+1. Cut `system` out of the backup (start 1,654,784, 3,932,160 sectors) and build the patch:
+
+   ```sh
+   python3 -I device/black-boot-animation.py system.img out/
+   ```
+
+   It writes `out/bootanimation-black.seg`, `out/bootanimation-stock.seg` and the hashes:
+
+   | What                        | SHA-256                                                            |
+   | --------------------------- | ------------------------------------------------------------------ |
+   | Stock zip                   | `4a23760fc54f1e4f2219ed0f0577fea6f55ee4468a079fdfddd54927122a7298` |
+   | Black zip                   | `d58c535c3fac8ca78b9eab606dd7c14e831f16410726fb528ef9741a747f2451` |
+   | Segment to write            | `4c8f066b33984e3a57fa3771c03cd802b1ed8d7de96f613d5041a4c3053f561b` |
+   | Stock segment, for the undo | `113dc6a5680dbcd9f9a005fe1d87d31a5341425fdfaa2d0578ee3ad5fa598e71` |
+
+2. Push the segment and make sure that it arrived intact:
+
+   ```sh
+   mise exec -- adb push out/bootanimation-black.seg /data/local/tmp/
+   mise exec -- adb shell sha256sum /data/local/tmp/bootanimation-black.seg   # must be 4c8f066b…
+   ```
+
+3. Android sets the read-only flag on `rknand0p11` (`blockdev --getro` prints 1), so `dd` to it fails with `Operation not permitted`. Write through the whole disk `rknand0` instead, where the same blocks start at block 504,380 (1,654,784 ÷ 8 + 297,532). Make sure that the live blocks are still stock. If it prints anything else, stop.
+
+   ```sh
+   mise exec -- adb shell 'su 0 sh -c "dd if=/dev/block/rknand0 bs=4096 skip=504380 count=91 2>/dev/null | sha256sum"'   # must be 113dc6a5…
+   ```
+
+4. Write, flush, and read back:
+
+   ```sh
+   mise exec -- adb shell su 0 dd if=/data/local/tmp/bootanimation-black.seg of=/dev/block/rknand0 bs=4096 seek=504380 count=91
+   mise exec -- adb shell su 0 sync
+   mise exec -- adb shell "su 0 sh -c 'echo 3 > /proc/sys/vm/drop_caches'"
+   mise exec -- adb shell 'su 0 sh -c "dd if=/dev/block/rknand0 bs=4096 skip=504380 count=91 2>/dev/null | sha256sum"'   # must be 4c8f066b…
+   mise exec -- adb shell su 0 sha256sum /system/media/bootanimation.zip                                          # must be d58c535c…
+   mise exec -- adb shell rm /data/local/tmp/bootanimation-black.seg
+   ```
+
+5. Reboot. On 2026-10-23 the zip was still `d58c535c…` after the reboot, and logcat showed `BootAnimation` running.
+
+The stock zip and `bootanimation-stock.seg` are in `backups/hy-s101/` of this repo.
+
+Undo: push `bootanimation-stock.seg` (hash `113dc6a5…`), make sure that the live blocks are `4c8f066b…`, then write it with `seek=504380 count=91` and make sure that `/system/media/bootanimation.zip` reads back as `4a23760f…`.
 
 ### Black boot logo
 
-This is the only write to flash so far. The logos are in `resource` (p4), a 16 MiB Rockchip `RSCE` image with three entries:
+This was the first write to flash. The logos are in `resource` (p4), a 16 MiB Rockchip `RSCE` image with three entries:
 
 | Entry             | Sector | Bytes     |
 | ----------------- | ------ | --------- |
@@ -296,6 +331,8 @@ mise exec -- adb shell cmd package set-home-activity --user 0 com.wesbos.homehq/
 ```
 
 `FRAME_KEY` comes from `.mise.toml` (see `README.md`). Home HQ stores the URL in its app data, which anyone with ADB and root can read. Its log leaves out the query.
+
+If the production key changes, run the `am start` command again. The kiosk keeps the old key, and the worker answers it with 404. On 2026-10-23 the saved key was 43 characters and the current key is 36, so the frame showed 404 until the command ran again.
 
 Wait 30 s before you reboot, because Android saves the Home choice a few seconds later. Then make sure that it is saved:
 

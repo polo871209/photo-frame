@@ -7,7 +7,7 @@
     "build": "vite build",
     "check": "tsc -p . && tsc -p worker",
     "preview": "vite preview",
-    "deploy": "vite build && wrangler deploy",
+    "deploy": "pnpm check && vite build && wrangler deploy",
     "types": "wrangler types",
     "screenshots": "node scripts/screenshots.mjs"
   },
