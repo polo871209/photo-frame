@@ -15,7 +15,6 @@ interface CalendarConfig extends CalendarInfo {
 }
 
 const MAX_RANGE_DAYS = 70;
-const ICS_CACHE_SECONDS = 300;
 const KEY_COOKIE = "frame_key";
 const COOKIE_MAX_AGE_SECONDS = 400 * 86400;
 
@@ -128,7 +127,7 @@ async function googleEvents(
     calendars.map(async (calendar) => {
       try {
         const response = await fetch(calendar.url, {
-          cf: { cacheTtl: ICS_CACHE_SECONDS, cacheEverything: true },
+          cf: { cacheTtl: 30, cacheEverything: true },
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return expandIcs(await response.text(), calendar.id, from, to);

@@ -2,8 +2,6 @@ import { useEffect, useState } from "preact/hooks";
 import type { CalendarInfo, EventsResponse } from "../../shared/events";
 import { toOccurrences, type Occurrence } from "./model";
 
-const REFRESH_MS = 5 * 60_000;
-
 export interface EventsState {
   occurrences: Occurrence[];
   calendars: CalendarInfo[];
@@ -21,7 +19,7 @@ export function useEvents(start: Date, end: Date): EventsState {
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
-    const timer = setInterval(() => setRefresh((n) => n + 1), REFRESH_MS);
+    const timer = setInterval(() => setRefresh((n) => n + 1), 30_000);
     return () => clearInterval(timer);
   }, []);
 

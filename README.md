@@ -53,7 +53,7 @@ Do not commit the iCal addresses. Anyone with the address can read the calendar.
 
 To hide a calendar or change its color, tap the sliders button at the top right of the frame. Each device stores these choices in its own `localStorage`, keyed by calendar name. The color in `CALENDARS` is the default, and its swatch is the first one in each row.
 
-If a feed fails, the other calendars still show and the header names the calendar that did not load. The worker caches each feed for 5 minutes, and the client refreshes every 5 minutes.
+If a feed fails, the other calendars still show and the header names the calendar that did not load. The worker caches each feed for 30 seconds, and the client refreshes every 30 seconds.
 
 ## Check and deploy
 
