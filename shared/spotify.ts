@@ -49,7 +49,7 @@ export interface Suggestions {
 /**
  * The body of `POST /api/spotify/control`.
  * `play` without `uri` resumes. `skipTo` skips ahead to a track in the queue.
- * `playTracks` plays the track URIs in `uris`, starting at index `offset`.
+ * `playTracks` plays the track at index `offset` of `uris`, then queues the tracks after it.
  */
 export type PlayerCommand =
   | { action: "pause" | "next" | "previous" }

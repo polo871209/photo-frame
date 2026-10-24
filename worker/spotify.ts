@@ -57,14 +57,14 @@ const SUGGESTION_KINDS: readonly string[] = [
   "artist",
 ] satisfies Suggestion["kind"][];
 
+const PLAY_PATH = "/me/player/play";
+
 const COMMANDS = {
-  play: ["PUT", "/me/player/play"],
-  playTracks: ["PUT", "/me/player/play"],
   pause: ["PUT", "/me/player/pause"],
   next: ["POST", "/me/player/next"],
   previous: ["POST", "/me/player/previous"],
 } as const satisfies Record<
-  Exclude<PlayerCommand["action"], "skipTo">,
+  Exclude<PlayerCommand["action"], "play" | "skipTo" | "playTracks">,
   [string, string]
 >;
 
@@ -295,33 +295,74 @@ async function control(
   command: PlayerCommand,
 ): Promise<void> {
   const token = await accessToken(credentials);
-  if (command.action === "skipTo") return skipTo(command.uri, token);
-  const [method, path] = COMMANDS[command.action];
-  const body =
-    command.action === "playTracks"
-      ? JSON.stringify({
-          uris: command.uris,
-          offset: { position: command.offset },
-        })
-      : command.action === "play" && command.uri
-        ? JSON.stringify({ context_uri: command.uri })
-        : undefined;
-  let response = await send(method, path, token, body);
+  switch (command.action) {
+    case "skipTo":
+      return skipTo(command.uri, token);
+    case "playTracks":
+      return playTracks(command.uris, command.offset, token);
+    case "play":
+      await play(token, command.uri ? { context_uri: command.uri } : undefined);
+      return;
+    default: {
+      const [method, path] = COMMANDS[command.action];
+      const response = await send(method, path, token);
+      if (!response.ok)
+        throw new Error(`Spotify ${path} HTTP ${response.status}`);
+    }
+  }
+}
+
+/** Starts playback and returns the device it sent the command to, or `undefined` for the active device. */
+async function play(
+  token: string,
+  body: object | undefined,
+): Promise<string | undefined> {
+  const json = body && JSON.stringify(body);
+  let response = await send("PUT", PLAY_PATH, token, json);
+  let deviceId: string | undefined;
   // Spotify answers 404 to a play command when no device is active, so wake the first device that can play.
-  if (response.status === 404 && path === COMMANDS.play[1]) {
+  if (response.status === 404) {
     const devices = await getJson<{
       devices: { id: string | null; is_restricted: boolean }[];
     }>("/me/player/devices", token);
-    const device = devices?.devices.find((d) => d.id && !d.is_restricted);
-    if (!device?.id) throw new Error("No Spotify device is open");
+    deviceId =
+      devices?.devices.find((d) => d.id && !d.is_restricted)?.id ?? undefined;
+    if (!deviceId) throw new Error("No Spotify device is open");
     response = await send(
-      method,
-      `${path}?device_id=${encodeURIComponent(device.id)}`,
+      "PUT",
+      `${PLAY_PATH}?device_id=${encodeURIComponent(deviceId)}`,
       token,
-      body,
+      json,
     );
   }
-  if (!response.ok) throw new Error(`Spotify ${path} HTTP ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Spotify ${PLAY_PATH} HTTP ${response.status}`);
+  return deviceId;
+}
+
+// The desktop app stops playback on a play command with a bare `uris` list, so play the track in its album and queue the rest: https://community.spotify.com/forum/en/discussion/7552922
+async function playTracks(
+  uris: string[],
+  offset: number,
+  token: string,
+): Promise<void> {
+  const picked = uris[offset]!;
+  const track = await getJson<SpotifyItem>(
+    `/tracks/${picked.split(":").at(-1)}`,
+    token,
+  );
+  if (!track?.album) throw new Error("That track has no album");
+  const deviceId = await play(token, {
+    context_uri: track.album.uri,
+    offset: { uri: picked },
+  });
+  const device = deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : "";
+  for (const uri of uris.slice(offset + 1)) {
+    const path = `/me/player/queue?uri=${encodeURIComponent(uri)}${device}`;
+    const response = await send("POST", path, token);
+    if (!response.ok)
+      throw new Error(`Spotify /me/player/queue HTTP ${response.status}`);
+  }
 }
 
 async function skipTo(uri: string, token: string): Promise<void> {
