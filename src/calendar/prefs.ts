@@ -1,9 +1,11 @@
 import { useState } from "preact/hooks";
 import type { Occurrence } from "./model";
+import { DEFAULT_VIEW, VIEWS, type ViewId } from "./views";
 
 export interface CalendarPrefs {
   hidden: string[];
   colors: Record<string, string>;
+  homeView: ViewId;
 }
 
 export const WHITE_TEXT_COLORS = [
@@ -43,9 +45,11 @@ function loadPrefs(): CalendarPrefs {
         stored?.colors && typeof stored.colors === "object"
           ? stored.colors
           : {},
+      homeView:
+        VIEWS.find(({ id }) => id === stored?.homeView)?.id ?? DEFAULT_VIEW,
     };
   } catch {
-    return { hidden: [], colors: {} };
+    return { hidden: [], colors: {}, homeView: DEFAULT_VIEW };
   }
 }
 

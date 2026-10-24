@@ -10,14 +10,7 @@ import { Schedule } from "./Schedule";
 import { SettingsSheet } from "./SettingsSheet";
 import { TimeGrid } from "./TimeGrid";
 import { useEvents } from "./useEvents";
-import {
-  DEFAULT_VIEW,
-  step,
-  title,
-  VIEWS,
-  visibleRange,
-  type ViewId,
-} from "./views";
+import { step, title, VIEWS, visibleRange, type ViewId } from "./views";
 
 const IDLE_RESET_MS = 3 * 60_000;
 const SWIPE_MIN_PX = 80;
@@ -26,11 +19,11 @@ const SWIPE_MAX_MS = 600;
 
 export function Calendar() {
   const now = useNow();
-  const [view, setView] = useState<ViewId>(DEFAULT_VIEW);
+  const [prefs, setPrefs] = useCalendarPrefs();
+  const [view, setView] = useState<ViewId>(prefs.homeView);
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [selected, setSelected] = useState<Occurrence | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [prefs, setPrefs] = useCalendarPrefs();
   const range = useMemo(() => visibleRange(view, anchor), [view, +anchor]);
   const events = useEvents(range.start, range.end);
   const occurrences = useMemo(
@@ -49,7 +42,7 @@ export function Calendar() {
       return;
     }
     if (
-      view === DEFAULT_VIEW &&
+      view === prefs.homeView &&
       sameDay(anchor, now) &&
       !selected &&
       !settingsOpen
@@ -57,9 +50,14 @@ export function Calendar() {
       return;
     setSelected(null);
     setSettingsOpen(false);
-    setView(DEFAULT_VIEW);
+    setView(prefs.homeView);
     setAnchor(startOfDay(now));
   }, [now]);
+
+  const pickView = (id: ViewId) => {
+    setView(id);
+    setPrefs({ ...prefs, homeView: id });
+  };
 
   const navigate = (direction: 1 | -1) =>
     setAnchor((current) => step(view, current, direction));
@@ -110,7 +108,7 @@ export function Calendar() {
             <button
               key={id}
               class={id === view ? "is-on" : ""}
-              onClick={() => setView(id)}
+              onClick={() => pickView(id)}
             >
               {label}
             </button>

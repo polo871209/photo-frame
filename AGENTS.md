@@ -35,7 +35,7 @@ The frame's system time zone is `Asia/Kuala_Lumpur` (`getprop persist.sys.timezo
 
 - `worker/`: the Cloudflare Worker. It runs first on every path (`run_worker_first: true` in `wrangler.jsonc`), checks the key, serves `/api/*` itself and passes everything else to the static assets.
 - `shared/`: types used by both the worker and the client. Change the API contract here first.
-- `src/calendar/`: the calendar screen. `views.ts` is the one list of views and owns each view's range, step and title. `prefs.ts` keeps each device's hidden calendars and color choices in `localStorage`, and `SettingsSheet.tsx` edits them. `layout.ts` places overlapping timed events in columns and packs all-day bars into rows.
+- `src/calendar/`: the calendar screen. `views.ts` is the one list of views and owns each view's range, step and title. `prefs.ts` keeps each device's hidden calendars, color choices and home view in `localStorage`. `SettingsSheet.tsx` edits the calendars, and the view switcher sets the home view. `layout.ts` places overlapping timed events in columns and packs all-day bars into rows.
 - `src/styles/`: `tokens.css` (colors, fonts, sizes), `base.css` (controls shared by all screens), and one file per screen.
 
 New screens (tasks, weather, photos) go in `src/<screen>/` with their own CSS file, and their data routes go under `/api/<screen>` in the worker.
@@ -57,7 +57,7 @@ The look follows the `dashboard/` folder in `wesbos/photo-frame-dashboard`: warm
 - Take colors from `tokens.css`. An element that shows a calendar color gets `--c` and `--c-rgb` through `colorVars(hex)` in `src/calendar/model.ts`.
 - Numbers use `.num` (narrow, heavy, tabular). Small caps labels use `.label`.
 - The time grid sizes an hour so 7 AM to 11 PM fills the view, and opens at 7 AM. The rest of the day scrolls (`useFittedHours` in `TimeGrid.tsx`).
-- After 3 min with no touch, the calendar goes back to the week view and today (`IDLE_RESET_MS` in `Calendar.tsx`).
+- The calendar opens in the home view, which is the view last picked in the view switcher (week on a new device). After 3 min with no touch, it goes back to the home view and today (`IDLE_RESET_MS` in `Calendar.tsx`). Tapping a day to open it does not change the home view.
 
 ## Make sure that a change works before you commit
 
