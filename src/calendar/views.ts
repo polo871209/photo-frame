@@ -54,7 +54,6 @@ export function step(view: ViewId, anchor: Date, direction: 1 | -1): Date {
 }
 
 export function title(view: ViewId, anchor: Date, range: VisibleRange): string {
-  if (view === "day") return format.fullDate(anchor);
   if (view === "month") return format.monthYear(anchor);
   const last = addDays(range.end, -1);
   if (range.start.getMonth() === last.getMonth())

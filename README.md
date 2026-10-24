@@ -10,11 +10,7 @@ mise exec -- pnpm install
 mise exec -- pnpm dev
 ```
 
-Create `.dev.vars` (git ignores it) with a local key, then open <http://localhost:5173/?key=local-dev>:
-
-```sh
-printf 'FRAME_KEY=local-dev\n' > .dev.vars
-```
+`pnpm dev` passes the variables in `.mise.toml` (git ignores it) to the local worker, so the local key is the production `FRAME_KEY`. Open `http://localhost:5173/?key=<FRAME_KEY>`.
 
 Without a calendar configuration, the worker returns sample events and the header shows "Sample events".
 
@@ -37,10 +33,10 @@ The worker reads each calendar's secret iCal address. Nobody needs to sign in, a
 
 1. In Google Calendar on the web, open **Settings**, select the calendar, and copy **Secret address in iCal format**.
 2. Repeat for each calendar. Pick a color for each one.
-3. For local development, put the list in `.dev.vars` (git ignores it):
+3. For local development, put the list in `.mise.toml` under `[env]`:
 
-   ```sh
-   CALENDARS='[{"name":"Family","url":"https://calendar.google.com/calendar/ical/.../basic.ics","color":"#D8321F"}]'
+   ```toml
+   CALENDARS = '[{"name":"Family","url":"https://calendar.google.com/calendar/ical/.../basic.ics","color":"#D8321F"}]'
    ```
 
 4. For production, store the same JSON as a secret:

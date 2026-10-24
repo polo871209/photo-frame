@@ -11,8 +11,9 @@
   --c: var(--ink);
   --c-rgb: 17 17 17;
 
-  --sans: 'Archivo Variable', 'Roboto Condensed', 'Roboto', sans-serif;
-  --serif: 'Instrument Serif', 'Noto Serif', Georgia, serif;
+  --sans: 'Fira Sans', 'Roboto', sans-serif;
+  --condensed: 'Fira Sans Condensed', 'Roboto Condensed', sans-serif;
+  --narrow: 'Fira Sans Extra Condensed', 'Roboto Condensed', sans-serif;
 
   --gutter: 64px;
   --tap: 52px;

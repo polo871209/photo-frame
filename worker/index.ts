@@ -2,6 +2,7 @@ import { BUILD_HEADER, BUILD_ID } from "../shared/build";
 import type { CalendarInfo, EventsResponse } from "../shared/events";
 import { expandIcs } from "./ics";
 import { sampleEvents, SAMPLE_CALENDARS } from "./sample";
+import { handleSpotify, type SpotifyCredentials } from "./spotify";
 
 interface Env {
   ASSETS: Fetcher;
@@ -9,6 +10,10 @@ interface Env {
   CALENDARS?: string;
   /** Shared secret. Every request must send it as `?key=` or in the `frame_key` cookie, or it gets 404. */
   FRAME_KEY?: string;
+  /** The Spotify app that `pnpm spotify-login` signed in with, and the refresh token it got. If any is unset, `/api/spotify` returns a sample track. */
+  SPOTIFY_CLIENT_ID?: string;
+  SPOTIFY_CLIENT_SECRET?: string;
+  SPOTIFY_REFRESH_TOKEN?: string;
 }
 
 interface CalendarConfig extends CalendarInfo {
@@ -27,7 +32,7 @@ export default {
     if (!(await isFrameKey(sentKey, env))) return notFound();
 
     const response = url.pathname.startsWith("/api/")
-      ? await handleApi(url, env)
+      ? await handleApi(request, url, env)
       : await serveAsset(request, url, env);
     if (queryKey === null) return response;
 
@@ -84,7 +89,14 @@ function sha256(value: string): Promise<ArrayBuffer> {
   return crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
 }
 
-async function handleApi(url: URL, env: Env): Promise<Response> {
+async function handleApi(
+  request: Request,
+  url: URL,
+  env: Env,
+): Promise<Response> {
+  if (url.pathname.startsWith("/api/spotify")) {
+    return handleSpotify(request, url.pathname, spotifyCredentials(env));
+  }
   if (url.pathname !== "/api/events") return notFound();
 
   const from = new Date(url.searchParams.get("from") ?? "");
@@ -115,6 +127,19 @@ async function handleApi(url: URL, env: Env): Promise<Response> {
   return Response.json(body, {
     headers: { "Cache-Control": "no-store", [BUILD_HEADER]: BUILD_ID },
   });
+}
+
+function spotifyCredentials(env: Env): SpotifyCredentials | null {
+  const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REFRESH_TOKEN } =
+    env;
+  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET || !SPOTIFY_REFRESH_TOKEN) {
+    return null;
+  }
+  return {
+    clientId: SPOTIFY_CLIENT_ID,
+    clientSecret: SPOTIFY_CLIENT_SECRET,
+    refreshToken: SPOTIFY_REFRESH_TOKEN,
+  };
 }
 
 function readCalendars(env: Env): CalendarConfig[] {

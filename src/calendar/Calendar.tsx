@@ -97,7 +97,7 @@ export function Calendar() {
         <button class="icon-btn" aria-label="Next" onClick={() => navigate(1)}>
           <Icon name="right" />
         </button>
-        <h1 class="cal-title serif">{title(view, anchor, range)}</h1>
+        <h1 class="cal-title title">{title(view, anchor, range)}</h1>
         <Status
           source={events.source}
           failed={events.failed}

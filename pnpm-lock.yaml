@@ -8,10 +8,13 @@ importers:
 
   .:
     dependencies:
-      '@fontsource-variable/archivo':
+      '@fontsource/fira-sans':
         specifier: ^5.3.0
         version: 5.3.0
-      '@fontsource/instrument-serif':
+      '@fontsource/fira-sans-condensed':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/fira-sans-extra-condensed':
         specifier: ^5.3.0
         version: 5.3.0
       ical.js:
@@ -282,11 +285,14 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@fontsource-variable/archivo@5.3.0':
-    resolution: {integrity: sha512-HogK8FJelrD1o7TlZlkIVtHgc20bO5PZRWE7mUeUTdMN055alznQV6/00J00IBeu8FQAH4s3zW9UJNvKExXf+g==}
+  '@fontsource/fira-sans-condensed@5.3.0':
+    resolution: {integrity: sha512-aYiPJnAwfvhHW1Yra+YPGdFvhvJhQax1wHb6aa6979ixPe51CspvxgZTJ8JNfIs3Gu7UcclUl6d2MuDnw1wsdg==}
 
-  '@fontsource/instrument-serif@5.3.0':
-    resolution: {integrity: sha512-mDiaIg0u67sYV59fie92Wz4sM8UiVlbL7fLxnFPCKkX15DMASEnQTREbaP5S5/3DCcsoAOcQ0sV9E4AeY4QqYQ==}
+  '@fontsource/fira-sans-extra-condensed@5.3.0':
+    resolution: {integrity: sha512-AiwnJulSkWNY0SYSOmdf3oFO9G8Soc3FYyYS81BWXVUSLqj2V/YXf4vC9xTohLOPIbXnDbpeelje692zLT5O6w==}
+
+  '@fontsource/fira-sans@5.3.0':
+    resolution: {integrity: sha512-z1SKSG7eRhm3srlb7rQ3j77QP4TP7OFxCZ4wUWhCdt+3hOF9K0AyvybpAsz6+JWNcCVV7AqC7dbOT3e67P2r5A==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -1129,9 +1135,11 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@fontsource-variable/archivo@5.3.0': {}
+  '@fontsource/fira-sans-condensed@5.3.0': {}
 
-  '@fontsource/instrument-serif@5.3.0': {}
+  '@fontsource/fira-sans-extra-condensed@5.3.0': {}
+
+  '@fontsource/fira-sans@5.3.0': {}
 
   '@img/colour@1.1.0': {}
 

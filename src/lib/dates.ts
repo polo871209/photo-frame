@@ -59,6 +59,24 @@ export const format = {
   }),
 };
 
+const clockFormat = new Intl.DateTimeFormat(undefined, {
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+/** The time of day with the AM/PM marker apart, for locales that use one. */
+export function clockParts(date: Date): { time: string; period: string } {
+  const parts = clockFormat.formatToParts(date);
+  return {
+    time: parts
+      .filter((part) => part.type !== "dayPeriod")
+      .map((part) => part.value)
+      .join("")
+      .trim(),
+    period: parts.find((part) => part.type === "dayPeriod")?.value ?? "",
+  };
+}
+
 export function formatTimeRange(start: Date, end: Date): string {
   return `${format.time(start)} – ${format.time(end)}`;
 }

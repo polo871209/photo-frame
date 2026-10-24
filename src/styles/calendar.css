@@ -4,7 +4,7 @@
 .cal-status {
   flex: none; padding: 6px 12px; border-radius: 999px;
   background: var(--paper-2); color: var(--ink-2);
-  font-size: 13px; font-weight: 800; font-stretch: 75%; letter-spacing: .06em; text-transform: uppercase;
+  font-size: 13px; font-weight: 800; font-family: var(--condensed); letter-spacing: .06em; text-transform: uppercase;
 }
 .cal-status.is-error { background: var(--alert); color: #fff; }
 .cal-body { flex: 1; min-height: 0; position: relative; touch-action: pan-y; }
@@ -35,7 +35,7 @@
 .tg-hour { position: absolute; left: var(--gutter); right: 0; border-top: 1px solid var(--line); }
 .tg-hour span {
   position: absolute; top: -9px; left: calc(-1 * var(--gutter)); width: 54px; text-align: right;
-  font-size: 13px; font-weight: 700; font-stretch: 80%; color: var(--mute); white-space: nowrap;
+  font-size: 13px; font-weight: 700; font-family: var(--condensed); color: var(--mute); white-space: nowrap;
 }
 .tg-cols { position: absolute; top: 0; bottom: 0; left: var(--gutter); right: 0; display: grid; }
 .tg-col { position: relative; border-left: 1px solid var(--line); }

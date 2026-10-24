@@ -15,7 +15,7 @@ export function Schedule({ days, occurrences, now, onSelect }: Props) {
     .filter((group) => group.items.length > 0);
 
   if (!groups.length) {
-    return <div class="empty serif">Nothing planned in the next four weeks.</div>;
+    return <div class="empty title">Nothing planned in the next four weeks.</div>;
   }
 
   return (

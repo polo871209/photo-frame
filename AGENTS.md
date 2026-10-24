@@ -19,7 +19,7 @@ The frame is an HY-S101 (Rockchip RK3326, Android 8.1 Go, about 976 MB RAM, 32-b
 - **Browser:** Android System WebView 106. `vite.config.ts` sets `build.target: chrome106` and `cssTarget: chrome61`. Keep `cssTarget` at `chrome61`, because WebView 106 rejects the 4- and 8-digit hex colors that newer targets let the minifier write.
 - **CSS:** write flat CSS. Use `rgb(var(--c-rgb) / .12)` for tints. Nesting, `color-mix()`, `oklch()` and `dvh` units do not work in WebView 106.
 - **Screen:** 1280×800 at 160 dpi, touch only. `src/App.tsx` draws a fixed 1280×800 `.stage` and scales it to the window, so lay out in fixed pixels for that size. Hover states never show. Tap targets are at least `--tap` (52px).
-- **Memory and CPU:** the frame is slow. Keep the bundle small (now 29 KB JS, 11 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time.
+- **Memory and CPU:** the frame is slow. Keep the bundle small (now 36 KB JS, 14 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time.
 - **Unattended:** nobody presses reload. Every fetch must fail soft and retry on the next refresh. `index.html` reloads the page if the bundle did not mount within 10 s.
 
 ## Time zone follows the system
@@ -35,27 +35,42 @@ The frame's system time zone is `Asia/Kuala_Lumpur` (`getprop persist.sys.timezo
 
 - `worker/`: the Cloudflare Worker. It runs first on every path (`run_worker_first: true` in `wrangler.jsonc`), checks the key, serves `/api/*` itself and passes everything else to the static assets.
 - `shared/`: types used by both the worker and the client. Change the API contract here first.
+- `src/App.tsx`: the stage and the rail on the left. The rail holds one icon for each screen and the clock, and it saves the open screen in `localStorage` (`frame.screen`).
 - `src/calendar/`: the calendar screen. `views.ts` is the one list of views and owns each view's range, step and title. `prefs.ts` keeps each device's hidden calendars, color choices and home view in `localStorage`. `SettingsSheet.tsx` edits the calendars, and the view switcher sets the home view. `layout.ts` places overlapping timed events in columns and packs all-day bars into rows.
+- `src/music/`: the music screen. It shows the track that plays on the owner's Spotify account, on any device, and the next tracks in the queue.
 - `src/styles/`: `tokens.css` (colors, fonts, sizes), `base.css` (controls shared by all screens), and one file per screen.
 
-New screens (tasks, weather, photos) go in `src/<screen>/` with their own CSS file, and their data routes go under `/api/<screen>` in the worker.
+New screens (tasks, weather, photos) go in `src/<screen>/` with their own CSS file, and their data routes go under `/api/<screen>` in the worker. Add each screen to `SCREENS` in `src/App.tsx`. Screen space is the limit, so a screen has no rounded corners or padding that it does not need.
 
 ## Calendar data comes from iCal feeds
 
 The worker reads Google Calendar through each calendar's secret iCal address. There is no OAuth and no Google token on the frame.
 
-- The `CALENDARS` variable is a JSON array of `{name, url, color}`. In development it lives in `.dev.vars`, and in production it is a Wrangler secret. If `CALENDARS` is unset, the worker returns sample events from `worker/sample.ts`, and the header shows "Sample events".
+- The `CALENDARS` variable is a JSON array of `{name, url, color}`. In development it lives in `.mise.toml` under `[env]`, and in production it is a Wrangler secret. If `CALENDARS` is unset, the worker returns sample events from `worker/sample.ts`, and the header shows "Sample events".
 - Every path needs the key, as `?key=` or as the `frame_key` cookie that a valid `?key=` sets. Otherwise the worker answers 404, and the same happens when `FRAME_KEY` is unset. `worker/index.ts` checks it before it serves assets through `env.ASSETS`. The production key is in `.mise.toml` under `[env]` (git ignores it). Never print it, log it or commit it. The kiosk saves the key in its URL, so after a key change, set the URL again as section 7 of `device/README.md` describes, or the frame shows 404.
 - The iCal addresses are secrets, because anyone with one can read the calendar. Keep them out of commits, logs, screenshots and error messages. `failed` in the response lists calendar names only.
 - Feeds are cached for 30 s at the edge, and the client refetches every 30 s. Expansion stops at 5000 occurrences for each feed, and a request can cover at most 70 days.
 - Recurrence goes through `ical.js`. Keep recurrence exceptions (`RECURRENCE-ID`), `EXDATE` and `STATUS:CANCELLED` working. Test a change in `worker/ics.ts` against a feed that has all three.
 
+## Music comes from the Spotify Web API
+
+The worker reads the owner's playback through the Spotify Web API (`worker/spotify.ts`). The frame holds no Spotify token.
+
+- The worker needs `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` and `SPOTIFY_REFRESH_TOKEN`. In development they live in `.mise.toml` under `[env]`, and in production they are Wrangler secrets. If one is unset, `/api/spotify` returns a sample track, and the screen shows "Sample track".
+- To get the refresh token, put the client ID and secret of the owner's Spotify app in `.mise.toml`, then run `pnpm spotify-login`. It saves the token to `.mise.toml`. The app must list the redirect URI `http://127.0.0.1:8888/callback`. With `--production`, the script also uploads the three secrets. Ask the owner before you run it with that flag.
+- Since February 2026, Development Mode allows one Spotify app for each developer and needs Premium. Before you call another endpoint, make sure that the [February 2026 changelog](https://developer.spotify.com/documentation/web-api/references/changes/february-2026) still lists it.
+- The client secret and the refresh token are secrets like the iCal addresses. Keep them out of commits, logs, screenshots and error messages.
+- The worker calls `GET /me/player` and `GET /me/player/queue`. When nothing plays, it also calls `GET /me/player/recently-played` and shows the last played track. The token's scopes are `SCOPES` in `scripts/spotify-login.mjs`. After you add a scope, the owner must run the login again.
+- `POST /api/spotify/control` takes a `PlayerCommand` (`shared/spotify.ts`). If no device is active, a play command goes to the first device in `GET /me/player/devices`. The Web API cannot jump into the queue, so `skipTo` sends `POST /me/player/next` once for each track before the picked one.
+- `GET /api/spotify/suggestions` feeds the picker. "Jump back in" is the playlists and albums of the last 50 played tracks, and "Your top songs" is `GET /me/top/tracks` for the last 4 weeks. Spotify answers 404 for the metadata of its own mixes (`spotify:playlist:37i9…`) in Development Mode, so they show as "Spotify mix".
+- The music screen polls `/api/spotify` only while it is open: every 5 s while a track plays, and every 15 s otherwise.
+
 ## Style comes from the old dashboard
 
-The look follows the `dashboard/` folder in `wesbos/photo-frame-dashboard`: warm paper background, ink text, Archivo (variable width) for text and numbers, Instrument Serif for titles. Event blocks are solid fills in the calendar's color.
+The look follows the `dashboard/` folder in `wesbos/photo-frame-dashboard`: warm paper background, ink text, and solid event blocks in the calendar's color. All text and numbers use Fira Sans. Fira Sans has no width axis, so narrow text takes a separate family: `--condensed` (Fira Sans Condensed) for labels and buttons, `--narrow` (Fira Sans Extra Condensed) for `.num`. `src/main.tsx` imports each weight on its own, so import a new weight there before you use it.
 
 - Take colors from `tokens.css`. An element that shows a calendar color gets `--c` and `--c-rgb` through `colorVars(hex)` in `src/calendar/model.ts`.
-- Numbers use `.num` (narrow, heavy, tabular). Small caps labels use `.label`.
+- Numbers use `.num` (narrow, heavy, tabular). Small caps labels use `.label`. Titles use `.title`.
 - The time grid sizes an hour so 7 AM to 11 PM fills the view, and opens at 7 AM. The rest of the day scrolls (`useFittedHours` in `TimeGrid.tsx`).
 - The calendar opens in the home view, which is the view last picked in the view switcher (week on a new device). After 3 min with no touch, it goes back to the home view and today (`IDLE_RESET_MS` in `Calendar.tsx`). Tapping a day to open it does not change the home view.
 
@@ -63,7 +78,7 @@ The look follows the `dashboard/` folder in `wesbos/photo-frame-dashboard`: warm
 
 1. Run `pnpm check`.
 2. Run `pnpm build`.
-3. Make sure that `.dev.vars` has `FRAME_KEY=local-dev`. Start `pnpm dev`, then run `pnpm screenshots "http://localhost:5173/?key=local-dev"`. It opens each view in Google Chrome at 1280×800 and writes PNGs to `screenshots/`, which git ignores. It exits non-zero on any page error. Look at every PNG.
+3. Start `pnpm dev`, then run `pnpm screenshots`. The `dev` script sets `CLOUDFLARE_INCLUDE_PROCESS_ENV=true`, so the local worker reads its variables from `.mise.toml` through mise. There is no `.dev.vars`. If a `.dev.vars` exists, Wrangler reads only that file. `pnpm screenshots` opens `localhost:5173` with `FRAME_KEY`. It opens each view in Google Chrome at 1280×800 and writes PNGs to `screenshots/`, which git ignores. It exits non-zero on any page error. Look at every PNG.
 4. If you changed CSS or a dependency, run `grep -oE "#[0-9a-fA-F]{4}\b|#[0-9a-fA-F]{8}\b" dist/client/assets/*.css`. It must print nothing.
 
 Chrome on the Mac is newer than WebView 106. A screenshot that passes does not prove that the frame renders the page. If a change uses a CSS or JS feature newer than Chrome 106, check it on caniuse.com or on the frame itself.
@@ -76,7 +91,7 @@ The frame reloads itself after a deploy, with no ADB and no hand:
 
 1. `vite.config.ts` puts one build ID (the build time) into both the client and the worker.
 2. Every `/api/events` response carries the worker's ID in the `Frame-Build` header (`shared/build.ts`).
-3. If that ID differs from the page's own, `Calendar.tsx` reloads the page once nobody has touched the frame for 3 min (`IDLE_RESET_MS`).
+3. If that ID differs from the page's own, `Calendar.tsx` reloads the page once nobody has touched the frame for 3 min (`IDLE_RESET_MS`). `App.tsx` keeps the calendar mounted but hidden while another screen is open, so this check runs on every screen.
 
 An untouched frame runs the new version within about 1 min of the deploy. Keep this chain working in every change, because without it a deploy reaches the frame only by hand.
 

@@ -3,17 +3,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "CLOUDFLARE_INCLUDE_PROCESS_ENV=true vite",
     "build": "vite build",
     "check": "tsc -p . && tsc -p worker",
     "preview": "vite preview",
     "deploy": "pnpm check && vite build && wrangler deploy",
     "types": "wrangler types",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "spotify-login": "node scripts/spotify-login.mjs"
   },
   "dependencies": {
-    "@fontsource-variable/archivo": "^5.3.0",
-    "@fontsource/instrument-serif": "^5.3.0",
+    "@fontsource/fira-sans": "^5.3.0",
+    "@fontsource/fira-sans-condensed": "^5.3.0",
+    "@fontsource/fira-sans-extra-condensed": "^5.3.0",
     "ical.js": "^2.2.1",
     "preact": "^11.0.1"
   },

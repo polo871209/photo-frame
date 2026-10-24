@@ -1,0 +1,56 @@
+.music { height: 100%; display: flex; }
+.music-art { flex: none; width: 800px; height: 800px; object-fit: cover; background: var(--paper-2); }
+.music-art-empty { display: grid; place-items: center; color: var(--mute); }
+.music-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 28px; }
+.music-title {
+  margin-top: 8px; font-size: 44px; line-height: 1.12;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+}
+.music-artist { margin-top: 10px; font-size: 24px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.music-album { margin-top: 2px; font-size: 18px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.music-bar { margin-top: 24px; height: 6px; background: var(--line); }
+.music-bar i { display: block; height: 100%; background: var(--ink); }
+.music-times { display: flex; justify-content: space-between; margin-top: 6px; font-size: 18px; color: var(--ink-2); }
+.music-next-label { margin-top: 32px; }
+.music-next { list-style: none; margin: 6px 0 0; padding: 0; }
+.music-row { width: 100%; display: flex; align-items: center; gap: 12px; height: 56px; }
+.music-row:active { background: var(--paper-2); }
+.music-row .num { flex: none; font-size: 17px; color: var(--mute); }
+.music-thumb { flex: none; width: 44px; height: 44px; object-fit: cover; background: var(--paper-2); }
+.music-thumb.music-art-empty svg { width: 20px; height: 20px; }
+.music-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.music-row-text b, .music-row-text span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.music-row-text b { font-size: 18px; font-weight: 600; }
+.music-row-text span { font-size: 15px; color: var(--mute); }
+.music .empty { flex: 1; }
+.music-status {
+  position: absolute; right: 0; bottom: 0; padding: 6px 12px;
+  background: var(--paper-2); color: var(--ink-2);
+  font-size: 13px; font-weight: 800; font-family: var(--condensed); letter-spacing: .06em; text-transform: uppercase;
+}
+.music-status.is-error { background: var(--alert); color: #fff; }
+.music-info--empty { padding: 0 64px; }
+.music-ctl { display: flex; align-items: center; gap: 4px; margin-top: 16px; }
+.music-ctl button { width: 56px; height: 56px; display: grid; place-items: center; color: var(--ink); }
+.music-ctl button:active { background: var(--paper-2); }
+.music-ctl .is-main { background: var(--ink); color: var(--paper); }
+.music-ctl .is-main:active { background: var(--ink-2); }
+.music-ctl .music-ctl-pick { margin-left: auto; }
+.music-pick { position: absolute; left: 0; top: 0; z-index: 10; width: 800px; height: 100%; display: flex; flex-direction: column; background: var(--paper); border-right: 1px solid var(--line); }
+.music-pick-x { position: absolute; top: 0; right: 0; z-index: 1; width: 56px; height: 56px; display: grid; place-items: center; background: var(--paper); }
+.music-pick-x:active { background: var(--paper-2); }
+.music-pick-note { padding: 8px 24px 24px; font-size: 20px; color: var(--mute); }
+.music-pick > .music-pick-note { padding-top: 32px; }
+.music-pick-body { flex: 1; min-height: 0; overflow-y: auto; padding: 32px 0 24px; }
+.music-pick-label { display: block; padding: 0 24px; }
+.music-pick-grid + .music-pick-label, .music-pick-note + .music-pick-label { margin-top: 8px; }
+.music-top { list-style: none; margin: 8px 0 0; padding: 0 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.music-pick-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px 16px; padding: 8px 24px 24px; }
+.music-tile { display: flex; flex-direction: column; min-width: 0; }
+.music-tile:active { opacity: .6; }
+.music-tile-art { width: 100%; height: 176px; object-fit: cover; background: var(--paper-2); }
+.music-tile b {
+  margin-top: 8px; font-size: 17px; font-weight: 600; line-height: 1.2;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.music-tile .label { margin-top: 4px; font-size: 12px; }

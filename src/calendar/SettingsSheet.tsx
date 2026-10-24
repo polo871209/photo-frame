@@ -23,7 +23,7 @@ export function SettingsSheet({
     <div class="sheet-layer" onClick={onClose}>
       <div class="sheet" onClick={(event) => event.stopPropagation()}>
         <div class="sheet-head">
-          <h2 class="serif">Calendars</h2>
+          <h2 class="title">Calendars</h2>
           <button class="icon-btn" onClick={onClose} aria-label="Close">
             <Icon name="close" size={28} />
           </button>

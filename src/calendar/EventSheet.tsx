@@ -18,7 +18,7 @@ export function EventSheet({
       >
         <div class="sheet-band">
           <span class="label label--on">{occurrence.calendar.name}</span>
-          <h2 class="serif">{occurrence.title}</h2>
+          <h2 class="title">{occurrence.title}</h2>
           <div class="sheet-when">{when(occurrence)}</div>
           <button class="sheet-x" onClick={onClose} aria-label="Close">
             <Icon name="close" size={28} />
