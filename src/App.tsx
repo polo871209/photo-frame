@@ -1,7 +1,11 @@
 import { useEffect, useState } from "preact/hooks";
+import type { ScreenId } from "../shared/control";
 import { Calendar } from "./calendar/Calendar";
+import { useFrameControl } from "./control/useFrameControl";
 import { Icon, type IconName } from "./icons";
 import { clockParts } from "./lib/dates";
+import { isIdle } from "./lib/idle";
+import { prefetchThenReload } from "./lib/reload";
 import { useNow } from "./lib/useNow";
 import { NowPlaying } from "./music/NowPlaying";
 
@@ -12,9 +16,7 @@ const SCREEN_KEY = "frame.screen";
 const SCREENS = [
   { id: "calendar", label: "Calendar", icon: "calendar" },
   { id: "music", label: "Music", icon: "music" },
-] as const satisfies readonly { id: string; label: string; icon: IconName }[];
-
-type ScreenId = (typeof SCREENS)[number]["id"];
+] as const satisfies readonly { id: ScreenId; label: string; icon: IconName }[];
 
 export function App() {
   const [scale, setScale] = useState(fitScale);
@@ -29,6 +31,14 @@ export function App() {
     setScreen(id);
     localStorage.setItem(SCREEN_KEY, id);
   };
+  const control = useFrameControl(pick);
+  useEffect(() => {
+    if (!control.buildChanged) return;
+    const timer = setInterval(() => {
+      if (isIdle() || !control.screenOn) prefetchThenReload();
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [control.buildChanged, control.screenOn]);
 
   return (
     <div class="stage" style={`transform:scale(${scale})`}>
@@ -41,6 +51,13 @@ export function App() {
         </main>
       )}
       <ScreenMenu screen={screen} onPick={pick} />
+      {!control.screenOn && (
+        <button
+          class="sleep"
+          aria-label="Wake"
+          onClick={() => control.send({ type: "screen", on: true })}
+        />
+      )}
     </div>
   );
 }

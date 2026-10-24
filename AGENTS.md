@@ -19,7 +19,7 @@ The frame is an HY-S101 (Rockchip RK3326, Android 8.1 Go, about 976 MB RAM, 32-b
 - **Browser:** Android System WebView 106. `vite.config.ts` sets `build.target: chrome106` and `cssTarget: chrome61`. Keep `cssTarget` at `chrome61`, because WebView 106 rejects the 4- and 8-digit hex colors that newer targets let the minifier write.
 - **CSS:** write flat CSS. Use `rgb(var(--c-rgb) / .12)` for tints. Nesting, `color-mix()`, `oklch()` and `dvh` units do not work in WebView 106.
 - **Screen:** 1280×800 at 160 dpi, touch only. `src/App.tsx` draws a fixed 1280×800 `.stage` and scales it to the window, so lay out in fixed pixels for that size. Hover states never show. Tap targets are at least `--tap` (52px).
-- **Memory and CPU:** the frame is slow. Keep the bundle small (now 36 KB JS, 14 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time.
+- **Memory and CPU:** the frame is slow. Keep the bundle small (now 38 KB JS, 14 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time.
 - **Unattended:** nobody presses reload. Every fetch must fail soft and retry on the next refresh. `index.html` reloads the page if the bundle did not mount within 10 s.
 
 ## Time zone follows the system
@@ -37,6 +37,7 @@ The frame's system time zone is `Asia/Kuala_Lumpur` (`getprop persist.sys.timezo
 - `shared/`: types used by both the worker and the client. Change the API contract here first.
 - `src/App.tsx`: the stage and the screen menu. The clock button floats at the top right of every screen, and a tap opens the list of screens. The open screen is saved in `localStorage` (`frame.screen`). Each screen gets the full 1280×800, so keep the top right `--menu-w` wide and `--tap` high free of controls.
 - `src/calendar/`: the calendar screen. `views.ts` is the one list of views and owns each view's range, step and title. `prefs.ts` keeps each device's hidden calendars, color choices and home view in `localStorage`. `SettingsSheet.tsx` edits the calendars, and the view switcher sets the home view. `layout.ts` places overlapping timed events in columns and packs all-day bars into rows.
+- `src/control/useFrameControl.ts`: the WebSocket that receives pushed commands. See [Push commands to the frame](#push-commands-to-the-frame).
 - `src/music/`: the music screen. It shows the track that plays on the owner's Spotify account, on any device, and the next tracks in the queue.
 - `src/styles/`: `tokens.css` (colors, fonts, sizes), `base.css` (controls shared by all screens), and one file per screen.
 
@@ -72,7 +73,7 @@ The look follows the `dashboard/` folder in `wesbos/photo-frame-dashboard`: warm
 - Take colors from `tokens.css`. An element that shows a calendar color gets `--c` and `--c-rgb` through `colorVars(hex)` in `src/calendar/model.ts`.
 - Numbers use `.num` (narrow, heavy, tabular). Small caps labels use `.label`. Titles use `.title`.
 - The time grid sizes an hour so 7 AM to 11 PM fills the view, and opens at 7 AM. The rest of the day scrolls (`useFittedHours` in `TimeGrid.tsx`).
-- The calendar opens in the home view, which is the view last picked in the view switcher (week on a new device). After 3 min with no touch, it goes back to the home view and today (`IDLE_RESET_MS` in `Calendar.tsx`). Tapping a day to open it does not change the home view.
+- The calendar opens in the home view, which is the view last picked in the view switcher (week on a new device). After 3 min with no touch on any screen, it goes back to the home view and today (`isIdle` in `src/lib/idle.ts`). Tapping a day to open it does not change the home view.
 
 ## Make sure that a change works before you commit
 
@@ -90,10 +91,10 @@ When a change passes the checks above, run `pnpm run deploy` without asking the 
 The frame reloads itself after a deploy, with no ADB and no hand:
 
 1. `vite.config.ts` puts one build ID (the build time) into both the client and the worker.
-2. Every `/api/events` response carries the worker's ID in the `Frame-Build` header (`shared/build.ts`).
-3. If that ID differs from the page's own, `Calendar.tsx` reloads the page once nobody has touched the frame for 3 min (`IDLE_RESET_MS`). `App.tsx` keeps the calendar mounted but hidden while another screen is open, so this check runs on every screen.
+2. A deploy restarts the `FrameControl` Durable Object, which closes the frame's WebSocket. The frame reconnects, and the first message carries the worker's build ID.
+3. If that ID differs from the page's own, `App.tsx` reloads the page once nobody has touched the frame for 3 min (`isIdle`), or at once while the screen is off. `prefetchThenReload` in `src/lib/reload.ts` loads the new files into the cache first, so the reload does not show a blank page.
 
-An untouched frame runs the new version within about 1 min of the deploy. Keep this chain working in every change, because without it a deploy reaches the frame only by hand.
+An untouched frame runs the new version within about 15 s of the deploy. Keep this chain working in every change, because without it a deploy reaches the frame only by hand.
 
 The worker serves every file under `/assets/` with `Cache-Control: private, max-age=31536000, immutable`, so the frame fetches only the files whose content hash changed. Add files there only through imports that Vite hashes, never through `public/assets/`.
 
@@ -102,3 +103,16 @@ If the change is to the kiosk APK itself and the frame is on ADB, install the AP
 Ask the owner before you change `CALENDARS` in production with `wrangler secret put`.
 
 After you change `wrangler.jsonc`, run `pnpm types` to regenerate `worker-configuration.d.ts`.
+
+## Push commands to the frame
+
+The frame keeps a WebSocket open to `/api/control`, and the `FrameControl` Durable Object (`worker/control.ts`) pushes each command to it at once. Commands change only the page and the kiosk window, so they need no question to the owner. Push them from the Mac with `pnpm frame`:
+
+- `pnpm frame status` prints the settings and `frames`, the number of open WebSockets. `frames: 0` means that the frame is offline or reconnecting.
+- `pnpm frame screen off` shows a black screen and sets the backlight to its lowest level (17 of 255 in sysfs, not fully dark). `pnpm frame screen on` undoes it, and so does a tap on the black screen. The setting survives reloads and deploys.
+- `pnpm frame show calendar` or `pnpm frame show music` opens a screen.
+- `pnpm frame reload` reloads the page at once.
+
+The script sends the frame's client certificate from `~/.config/photo-frame/mtls/`. `FRAME_URL=http://localhost:5173 pnpm frame …` targets `pnpm dev`.
+
+To add a command, add it to `FrameCommand` and `parseCommand` in `shared/control.ts`, then handle it in `useFrameControl.ts`. Keep state that must survive a reconnect in `FrameSettings`, because the worker sends it on every connect. The backlight goes through `window.HomeHQ.setBacklight`, which the kiosk adds from version 1.2-mtls (`device/homehq.patch`). In a desktop browser, `screen off` shows only the black screen.

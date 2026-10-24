@@ -1,11 +1,15 @@
-import { BUILD_HEADER, BUILD_ID } from "../shared/build";
+import { parseCommand } from "../shared/control";
 import type { CalendarInfo, EventsResponse } from "../shared/events";
+import type { FrameControl } from "./control";
 import { expandIcs } from "./ics";
 import { sampleEvents, SAMPLE_CALENDARS } from "./sample";
 import { handleSpotify, type SpotifyCredentials } from "./spotify";
 
+export { FrameControl } from "./control";
+
 interface Env {
   ASSETS: Fetcher;
+  FRAME_CONTROL: DurableObjectNamespace<FrameControl>;
   /** JSON array of `{ "name", "url", "color" }`. `url` is a Google Calendar secret iCal address. */
   CALENDARS?: string;
   /** The Spotify app that `pnpm spotify-login` signed in with, and the refresh token it got. If any is unset, `/api/spotify` returns a sample track. */
@@ -71,6 +75,7 @@ async function handleApi(
   if (url.pathname.startsWith("/api/spotify")) {
     return handleSpotify(request, url.pathname, spotifyCredentials(env));
   }
+  if (url.pathname === "/api/control") return handleControl(request, env);
   if (url.pathname !== "/api/events") return notFound();
 
   const from = new Date(url.searchParams.get("from") ?? "");
@@ -99,8 +104,27 @@ async function handleApi(
         failed: [],
       };
   return Response.json(body, {
-    headers: { "Cache-Control": "no-store", [BUILD_HEADER]: BUILD_ID },
+    headers: { "Cache-Control": "no-store" },
   });
+}
+
+async function handleControl(request: Request, env: Env): Promise<Response> {
+  const control = env.FRAME_CONTROL.getByName("frame");
+  if (request.headers.get("Upgrade") === "websocket") return control.fetch(request);
+  if (request.method === "GET") return noStore(await control.status());
+  if (request.method !== "POST") return new Response(null, { status: 405 });
+  const command = parseCommand(await request.json().catch(() => undefined));
+  if (!command) {
+    return Response.json(
+      { error: 'expected {"type":"screen","on":boolean}, {"type":"show","screen":"calendar"|"music"} or {"type":"reload"}' },
+      { status: 400 },
+    );
+  }
+  return noStore(await control.command(command));
+}
+
+function noStore(body: unknown): Response {
+  return Response.json(body, { headers: { "Cache-Control": "no-store" } });
 }
 
 function spotifyCredentials(env: Env): SpotifyCredentials | null {

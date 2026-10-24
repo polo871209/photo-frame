@@ -1,5 +1,5 @@
 *, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #0B0B0B; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--paper); }
 body {
   font-family: var(--sans);
   font-size: 18px;
@@ -34,6 +34,7 @@ h1, h2, p { margin: 0; font-weight: inherit; }
 }
 .screen { flex: 1; min-width: 0; height: 100%; position: relative; }
 .screen[hidden] { display: none; }
+.sleep { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 100; width: 100%; background: #000; }
 
 .menu { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 40; pointer-events: none; }
 .menu-scrim {

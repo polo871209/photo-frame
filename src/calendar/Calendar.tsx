@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Icon } from "../icons";
 import { sameDay, startOfDay } from "../lib/dates";
+import { isIdle } from "../lib/idle";
 import { useNow } from "../lib/useNow";
 import { EventSheet } from "./EventSheet";
 import type { Occurrence } from "./model";
@@ -12,7 +13,6 @@ import { TimeGrid } from "./TimeGrid";
 import { useEvents } from "./useEvents";
 import { step, title, VIEWS, visibleRange, type ViewId } from "./views";
 
-const IDLE_RESET_MS = 3 * 60_000;
 const SWIPE_MIN_PX = 80;
 const SWIPE_MAX_DRIFT_PX = 60;
 const SWIPE_MAX_MS = 600;
@@ -31,16 +31,11 @@ export function Calendar() {
     [events.occurrences, prefs],
   );
 
-  const lastTouch = useRef(Date.now());
   const swipeStart = useRef<{ x: number; y: number; at: number } | null>(null);
   const ignoreTapsUntil = useRef(0);
 
   useEffect(() => {
-    if (Date.now() - lastTouch.current < IDLE_RESET_MS) return;
-    if (events.buildChanged) {
-      location.reload();
-      return;
-    }
+    if (!isIdle()) return;
     if (
       view === prefs.homeView &&
       sameDay(anchor, now) &&
@@ -78,7 +73,7 @@ export function Calendar() {
       : range.start <= now && now < range.end;
 
   return (
-    <div class="cal" onPointerDown={() => (lastTouch.current = Date.now())}>
+    <div class="cal">
       <header class="cal-head">
         <button
           class="btn"

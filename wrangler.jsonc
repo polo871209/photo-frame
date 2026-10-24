@@ -10,5 +10,9 @@
     "binding": "ASSETS",
     "run_worker_first": true
   },
+  "durable_objects": {
+    "bindings": [{ "name": "FRAME_CONTROL", "class_name": "FrameControl" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FrameControl"] }],
   "observability": { "enabled": true }
 }

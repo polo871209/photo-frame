@@ -10,7 +10,8 @@
     "deploy": "pnpm check && vite build && wrangler deploy",
     "types": "wrangler types",
     "screenshots": "node scripts/screenshots.mjs",
-    "spotify-login": "node scripts/spotify-login.mjs"
+    "spotify-login": "node scripts/spotify-login.mjs",
+    "frame": "sh scripts/frame.sh"
   },
   "dependencies": {
     "@fontsource/fira-sans": "^5.3.0",

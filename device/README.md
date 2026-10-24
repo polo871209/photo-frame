@@ -303,22 +303,29 @@ To set the time zone, open Android Settings → System → Date & time, turn off
 
 ## 7. Home HQ kiosk as Home
 
-Home HQ is the kiosk app from `dashboard/kiosk` in `wesbos/photo-frame-dashboard`. It shows `https://photoframe.lochingpo.com/` full screen in WebView 106, retries every 5 s when the page fails to load, and opens native controls on a two-finger hold of 1.5 s. Its README lists every feature.
+Home HQ is the kiosk app from `dashboard/kiosk` in `wesbos/photo-frame-dashboard`. It shows `https://photoframe.lochingpo.com/` full screen in WebView 106, retries every 5 s when the page fails to load, and opens native controls on a two-finger hold of 1.5 s. Its README lists every feature. Our build adds the client certificate and `window.HomeHQ.setBacklight(on)`, which `pnpm frame screen off` uses (see `AGENTS.md`).
 
 ### Build
 
-The APK was built on 2026-10-24 from upstream commit `f1e0820` with `homehq-client-cert.patch` from this folder applied. The patch adds the TLS client certificate (see [Client certificate](#client-certificate)) and sets the version to 1.1-mtls (version code 3). Build-tools 37.0.0 and platform 37.2 come from `sdkmanager`, and JDK Temurin 17 comes from mise. Upstream's `build.sh` hard-codes platform 34, so the build uses a copy with the platform path changed:
+The APK was built on 2026-10-24 from upstream commit `f1e0820` with `homehq.patch` from this folder applied. The patch adds the TLS client certificate (see [Client certificate](#client-certificate)) and the `HomeHQ.setBacklight` JavaScript bridge, and sets the version to 1.2-mtls (version code 4). Build-tools 37.0.0 and platform 37.2 come from `sdkmanager`, and JDK Temurin 17 comes from mise. Upstream's `build.sh` hard-codes platform 34, so the build uses a copy with the platform path changed:
 
 ```sh
 git clone https://github.com/wesbos/photo-frame-dashboard.git && cd photo-frame-dashboard
 git checkout f1e0820
-git apply ~/app/photo-frame/device/homehq-client-cert.patch
+git apply ~/app/photo-frame/device/homehq.patch
 sdkmanager --sdk_root=$ANDROID_HOME "build-tools;37.0.0" "platforms;android-37.2"
 sed 's#platforms/android-34/#platforms/android-37.2/#' dashboard/kiosk/build.sh > dashboard/kiosk/build-latest.sh
 mise exec java@temurin-17 -- env BUILD_TOOLS=$ANDROID_HOME/build-tools/37.0.0 bash dashboard/kiosk/build-latest.sh
 ```
 
-The result is `com.wesbos.homehq` 1.1-mtls (version code 3), minSdk 23, targetSdk 28, signed with APK Signature Scheme v2 and v3. Its SHA-256 was `f9c77bc545de2c0821e4cf7f2426f239fb92ca0ef6e67c8e635f9aaaad80b81b`. It replaced the unpatched 1.1 (version code 2, SHA-256 `c1633c68785b9d479543fbff976ad3c6af5b488a26920ff738cf655d3e8c02de`) on 2026-10-24. targetSdk stays at 28 because a higher target changes nothing on Android 8.1, and upstream says that 30 and higher need manifest changes.
+The result is `com.wesbos.homehq` 1.2-mtls (version code 4), minSdk 23, targetSdk 28, signed with APK Signature Scheme v2 and v3. Its SHA-256 was `fde5d459919a46d082c9d548d58a13b0f7b33b233662126fdf68aa1c8fe7046f`. It was installed with `adb install -r` on 2026-10-24 and replaced these builds:
+
+| Version  | Code | SHA-256                                                            | Patch                                                       |
+| -------- | ---- | ------------------------------------------------------------------ | ----------------------------------------------------------- |
+| 1.1-mtls | 3    | `f9c77bc545de2c0821e4cf7f2426f239fb92ca0ef6e67c8e635f9aaaad80b81b` | `homehq-client-cert.patch`, in git history before this file |
+| 1.1      | 2    | `c1633c68785b9d479543fbff976ad3c6af5b488a26920ff738cf655d3e8c02de` | none                                                        |
+
+To undo the bridge, build 1.1-mtls with the patch from `git show 599a484:device/homehq-client-cert.patch`, and install it with `adb install -r -d`. Without the bridge, `pnpm frame screen off` shows a black screen at full backlight. targetSdk stays at 28 because a higher target changes nothing on Android 8.1, and upstream says that 30 and higher need manifest changes.
 
 The APK is signed with `~/.android/debug.keystore` on the Mac that built it. An update with `adb install -r` must be signed with the same key. With another key, uninstall first.
 

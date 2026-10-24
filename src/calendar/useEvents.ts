@@ -1,5 +1,4 @@
 import { useEffect, useState } from "preact/hooks";
-import { BUILD_HEADER, BUILD_ID } from "../../shared/build";
 import type { CalendarInfo, EventsResponse } from "../../shared/events";
 import { toOccurrences, type Occurrence } from "./model";
 
@@ -9,7 +8,6 @@ export interface EventsState {
   source?: EventsResponse["source"];
   failed: string[];
   error?: string;
-  buildChanged: boolean;
 }
 
 export function useEvents(start: Date, end: Date): EventsState {
@@ -17,7 +15,6 @@ export function useEvents(start: Date, end: Date): EventsState {
     occurrences: [],
     calendars: [],
     failed: [],
-    buildChanged: false,
   });
   const [refresh, setRefresh] = useState(0);
 
@@ -41,7 +38,6 @@ export function useEvents(start: Date, end: Date): EventsState {
           calendars: body.calendars,
           source: body.source,
           failed: body.failed,
-          buildChanged: response.headers.get(BUILD_HEADER) !== BUILD_ID,
         });
       })
       .catch((error: Error) => {
