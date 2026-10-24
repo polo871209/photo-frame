@@ -33,7 +33,7 @@ The frame's system time zone is `Asia/Kuala_Lumpur` (`getprop persist.sys.timezo
 
 ## Layout of the code
 
-- `worker/`: the Cloudflare Worker. It runs first on every path (`run_worker_first: true` in `wrangler.jsonc`), checks the key, serves `/api/*` itself and passes everything else to the static assets.
+- `worker/`: the Cloudflare Worker. It runs first on every path (`run_worker_first: true` in `wrangler.jsonc`), checks the client certificate, serves `/api/*` itself and passes everything else to the static assets.
 - `shared/`: types used by both the worker and the client. Change the API contract here first.
 - `src/App.tsx`: the stage and the rail on the left. The rail holds one icon for each screen and the clock, and it saves the open screen in `localStorage` (`frame.screen`).
 - `src/calendar/`: the calendar screen. `views.ts` is the one list of views and owns each view's range, step and title. `prefs.ts` keeps each device's hidden calendars, color choices and home view in `localStorage`. `SettingsSheet.tsx` edits the calendars, and the view switcher sets the home view. `layout.ts` places overlapping timed events in columns and packs all-day bars into rows.
@@ -47,7 +47,7 @@ New screens (tasks, weather, photos) go in `src/<screen>/` with their own CSS fi
 The worker reads Google Calendar through each calendar's secret iCal address. There is no OAuth and no Google token on the frame.
 
 - The `CALENDARS` variable is a JSON array of `{name, url, color}`. In development it lives in `.mise.toml` under `[env]`, and in production it is a Wrangler secret. If `CALENDARS` is unset, the worker returns sample events from `worker/sample.ts`, and the header shows "Sample events".
-- Every path needs the key, as `?key=` or as the `frame_key` cookie that a valid `?key=` sets. Otherwise the worker answers 404, and the same happens when `FRAME_KEY` is unset. `worker/index.ts` checks it before it serves assets through `env.ASSETS`. The production key is in `.mise.toml` under `[env]` (git ignores it). Never print it, log it or commit it. The kiosk saves the key in its URL, so after a key change, set the URL again as section 7 of `device/README.md` describes, or the frame shows 404.
+- Every path needs a TLS client certificate from the account's Cloudflare-managed CA. `hasClientCertificate` in `worker/index.ts` checks it before it serves assets through `env.ASSETS`, and answers 404 without one. `pnpm dev` skips the check (`import.meta.env.DEV`), and no other path may skip it. The frame's private key is in `~/.config/photo-frame/mtls/`. Never print it, log it or commit it. `README.md` and section 7 of `device/README.md` describe how to issue and install a certificate.
 - The iCal addresses are secrets, because anyone with one can read the calendar. Keep them out of commits, logs, screenshots and error messages. `failed` in the response lists calendar names only.
 - Feeds are cached for 30 s at the edge, and the client refetches every 30 s. Expansion stops at 5000 occurrences for each feed, and a request can cover at most 70 days.
 - Recurrence goes through `ical.js`. Keep recurrence exceptions (`RECURRENCE-ID`), `EXDATE` and `STATUS:CANCELLED` working. Test a change in `worker/ics.ts` against a feed that has all three.
@@ -78,7 +78,7 @@ The look follows the `dashboard/` folder in `wesbos/photo-frame-dashboard`: warm
 
 1. Run `pnpm check`.
 2. Run `pnpm build`.
-3. Start `pnpm dev`, then run `pnpm screenshots`. The `dev` script sets `CLOUDFLARE_INCLUDE_PROCESS_ENV=true`, so the local worker reads its variables from `.mise.toml` through mise. There is no `.dev.vars`. If a `.dev.vars` exists, Wrangler reads only that file. `pnpm screenshots` opens `localhost:5173` with `FRAME_KEY`. It opens each view in Google Chrome at 1280×800 and writes PNGs to `screenshots/`, which git ignores. It exits non-zero on any page error. Look at every PNG.
+3. Start `pnpm dev`, then run `pnpm screenshots`. The `dev` script sets `CLOUDFLARE_INCLUDE_PROCESS_ENV=true`, so the local worker reads its variables from `.mise.toml` through mise. There is no `.dev.vars`. If a `.dev.vars` exists, Wrangler reads only that file. `pnpm screenshots` opens `localhost:5173`. It opens each view in Google Chrome at 1280×800 and writes PNGs to `screenshots/`, which git ignores. It exits non-zero on any page error. Look at every PNG.
 4. If you changed CSS or a dependency, run `grep -oE "#[0-9a-fA-F]{4}\b|#[0-9a-fA-F]{8}\b" dist/client/assets/*.css`. It must print nothing.
 
 Chrome on the Mac is newer than WebView 106. A screenshot that passes does not prove that the frame renders the page. If a change uses a CSS or JS feature newer than Chrome 106, check it on caniuse.com or on the frame itself.

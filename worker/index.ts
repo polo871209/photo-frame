@@ -8,8 +8,6 @@ interface Env {
   ASSETS: Fetcher;
   /** JSON array of `{ "name", "url", "color" }`. `url` is a Google Calendar secret iCal address. */
   CALENDARS?: string;
-  /** Shared secret. Every request must send it as `?key=` or in the `frame_key` cookie, or it gets 404. */
-  FRAME_KEY?: string;
   /** The Spotify app that `pnpm spotify-login` signed in with, and the refresh token it got. If any is unset, `/api/spotify` returns a sample track. */
   SPOTIFY_CLIENT_ID?: string;
   SPOTIFY_CLIENT_SECRET?: string;
@@ -21,29 +19,25 @@ interface CalendarConfig extends CalendarInfo {
 }
 
 const MAX_RANGE_DAYS = 70;
-const KEY_COOKIE = "frame_key";
-const COOKIE_MAX_AGE_SECONDS = 400 * 86400;
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request, env): Promise<Response> {
+    if (!import.meta.env.DEV && !hasClientCertificate(request)) {
+      return notFound();
+    }
     const url = new URL(request.url);
-    const queryKey = url.searchParams.get("key");
-    const sentKey = queryKey ?? readCookie(request, KEY_COOKIE) ?? "";
-    if (!(await isFrameKey(sentKey, env))) return notFound();
-
-    const response = url.pathname.startsWith("/api/")
-      ? await handleApi(request, url, env)
-      : await serveAsset(request, url, env);
-    if (queryKey === null) return response;
-
-    const withCookie = new Response(response.body, response);
-    withCookie.headers.append(
-      "Set-Cookie",
-      `${KEY_COOKIE}=${queryKey}; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Strict`,
-    );
-    return withCookie;
+    return url.pathname.startsWith("/api/")
+      ? handleApi(request, url, env)
+      : serveAsset(request, url, env);
   },
 } satisfies ExportedHandler<Env>;
+
+function hasClientCertificate(
+  request: Request<unknown, IncomingRequestCfProperties>,
+): boolean {
+  const auth = request.cf?.tlsClientAuth;
+  return auth?.certVerified === "SUCCESS" && auth.certRevoked === "0";
+}
 
 async function serveAsset(
   request: Request,
@@ -67,26 +61,6 @@ function notFound(): Response {
     status: 404,
     headers: { "Cache-Control": "no-store" },
   });
-}
-
-function readCookie(request: Request, name: string): string | undefined {
-  return request.headers
-    .get("Cookie")
-    ?.split(";")
-    .map((pair) => pair.trim().split("="))
-    .find(([key]) => key === name)?.[1];
-}
-
-async function isFrameKey(sentKey: string, env: Env): Promise<boolean> {
-  if (!env.FRAME_KEY) return false;
-  return crypto.subtle.timingSafeEqual(
-    await sha256(sentKey),
-    await sha256(env.FRAME_KEY),
-  );
-}
-
-function sha256(value: string): Promise<ArrayBuffer> {
-  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
 }
 
 async function handleApi(

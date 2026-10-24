@@ -303,21 +303,22 @@ To set the time zone, open Android Settings → System → Date & time, turn off
 
 ## 7. Home HQ kiosk as Home
 
-Home HQ is the kiosk app from `dashboard/kiosk` in `wesbos/photo-frame-dashboard`. It shows `https://photoframe.lochingpo.com/?key=<FRAME_KEY>` full screen in WebView 106, retries every 5 s when the page fails to load, and opens native controls on a two-finger hold of 1.5 s. Its README lists every feature.
+Home HQ is the kiosk app from `dashboard/kiosk` in `wesbos/photo-frame-dashboard`. It shows `https://photoframe.lochingpo.com/` full screen in WebView 106, retries every 5 s when the page fails to load, and opens native controls on a two-finger hold of 1.5 s. Its README lists every feature.
 
 ### Build
 
-The APK was built on 2026-10-22 from upstream commit `f1e0820`, with the newest stable tools. Build-tools 37.0.0 and platform 37.2 come from `sdkmanager`, and JDK Temurin 27 comes from mise. Upstream's `build.sh` hard-codes platform 34, so the build uses a copy with the platform path changed:
+The APK was built on 2026-10-24 from upstream commit `f1e0820` with `homehq-client-cert.patch` from this folder applied. The patch adds the TLS client certificate (see [Client certificate](#client-certificate)) and sets the version to 1.1-mtls (version code 3). Build-tools 37.0.0 and platform 37.2 come from `sdkmanager`, and JDK Temurin 17 comes from mise. Upstream's `build.sh` hard-codes platform 34, so the build uses a copy with the platform path changed:
 
 ```sh
 git clone https://github.com/wesbos/photo-frame-dashboard.git && cd photo-frame-dashboard
 git checkout f1e0820
+git apply ~/app/photo-frame/device/homehq-client-cert.patch
 sdkmanager --sdk_root=$ANDROID_HOME "build-tools;37.0.0" "platforms;android-37.2"
 sed 's#platforms/android-34/#platforms/android-37.2/#' dashboard/kiosk/build.sh > dashboard/kiosk/build-latest.sh
-BUILD_TOOLS=$ANDROID_HOME/build-tools/37.0.0 bash dashboard/kiosk/build-latest.sh
+mise exec java@temurin-17 -- env BUILD_TOOLS=$ANDROID_HOME/build-tools/37.0.0 bash dashboard/kiosk/build-latest.sh
 ```
 
-The result is `com.wesbos.homehq` 1.1 (version code 2), minSdk 23, targetSdk 28, signed with APK Signature Scheme v2 and v3. Its SHA-256 was `c1633c68785b9d479543fbff976ad3c6af5b488a26920ff738cf655d3e8c02de`. targetSdk stays at 28 because a higher target changes nothing on Android 8.1, and upstream says that 30 and higher need manifest changes.
+The result is `com.wesbos.homehq` 1.1-mtls (version code 3), minSdk 23, targetSdk 28, signed with APK Signature Scheme v2 and v3. Its SHA-256 was `f9c77bc545de2c0821e4cf7f2426f239fb92ca0ef6e67c8e635f9aaaad80b81b`. It replaced the unpatched 1.1 (version code 2, SHA-256 `c1633c68785b9d479543fbff976ad3c6af5b488a26920ff738cf655d3e8c02de`) on 2026-10-24. targetSdk stays at 28 because a higher target changes nothing on Android 8.1, and upstream says that 30 and higher need manifest changes.
 
 The APK is signed with `~/.android/debug.keystore` on the Mac that built it. An update with `adb install -r` must be signed with the same key. With another key, uninstall first.
 
@@ -325,14 +326,12 @@ The APK is signed with `~/.android/debug.keystore` on the Mac that built it. An 
 
 ```sh
 mise exec -- adb install homehq.apk
-mise exec -- sh -c 'adb shell am start -n com.wesbos.homehq/.MainActivity --es url "https://photoframe.lochingpo.com/?key=$FRAME_KEY"'
+mise exec -- adb shell am start -n com.wesbos.homehq/.MainActivity --es url https://photoframe.lochingpo.com/
 mise exec -- adb shell am start -n com.wesbos.homehq/.MainActivity --ez home true
 mise exec -- adb shell cmd package set-home-activity --user 0 com.wesbos.homehq/.Home
 ```
 
-`FRAME_KEY` comes from `.mise.toml` (see `README.md`). Home HQ stores the URL in its app data, which anyone with ADB and root can read. Its log leaves out the query.
-
-If the production key changes, run the `am start` command again. The kiosk keeps the old key, and the worker answers it with 404. On 2026-10-23 the saved key was 43 characters and the current key is 36, so the frame showed 404 until the command ran again.
+Then give the kiosk the client certificate, as [Client certificate](#client-certificate) describes. Without it, the worker answers 404.
 
 Wait 30 s before you reboot, because Android saves the Home choice a few seconds later. Then make sure that it is saved:
 
@@ -346,6 +345,30 @@ If the kiosk shows "Can't reach the dashboard" and logcat shows `HomeHQ: Load fa
 To reach Android Settings or Pixel Launcher from the kiosk, hold two fingers on the screen for 1.5 s, then tap **Android settings** or **Open launcher**.
 
 Undo: `cmd package set-home-activity --user 0 amirz.rootless.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity`, then `am start -n com.wesbos.homehq/.MainActivity --ez home false`, then `adb uninstall com.wesbos.homehq`.
+
+### Client certificate
+
+The frame proves itself with a TLS client certificate (mTLS), and the worker answers 404 to every request without one. `README.md` describes the Cloudflare side.
+
+The key is ECDSA P-256, made on the Mac on 2026-10-24. The files are in `~/.config/photo-frame/mtls/` with mode 600: `frame.key` (PEM), `frame.key.der` (PKCS#8 DER), `frame.csr`, and `frame.crt` (from the Cloudflare-managed CA). Never commit, log or screenshot `frame.key` or `frame.key.der`.
+
+The certificate is `CN=hy-s101-frame` from the Cloudflare-managed CA, valid until 2036-10-21. It went on the frame on 2026-10-24. The same day the saved URL lost its `?key=`, because the worker no longer reads a key.
+
+To give the kiosk the certificate, run from this repository:
+
+```sh
+d=~/.config/photo-frame/mtls
+mise exec -- adb shell am start -n com.wesbos.homehq/.MainActivity \
+  --es client_key "$(base64 -i $d/frame.key.der)" \
+  --es client_cert "$(openssl x509 -in $d/frame.crt -outform DER | base64)"
+mise exec -- adb logcat -d -s HomeHQ | grep 'Client certificate'   # Client certificate saved for photoframe.lochingpo.com
+```
+
+The kiosk checks that the key matches the certificate, then saves both in its app data, which anyone with ADB and root can read. It offers them only to the host of the saved URL at the time of the save. After a host change, send the certificate again.
+
+If the frame shows "Not found" with a valid certificate saved, restart the kiosk with `am force-stop com.wesbos.homehq`, then `am start -n com.wesbos.homehq/.MainActivity`. WebView reuses TLS connections and sessions, and one opened without a certificate stays without one. On 2026-10-24, connections from before mTLS was on for the host got 404 until this restart.
+
+Undo: `am start -n com.wesbos.homehq/.MainActivity --ez forget_client_cert true`. The frame then gets 404 until the worker stops checking for a certificate.
 
 ## Not done yet
 

@@ -10,22 +10,17 @@ mise exec -- pnpm install
 mise exec -- pnpm dev
 ```
 
-`pnpm dev` passes the variables in `.mise.toml` (git ignores it) to the local worker, so the local key is the production `FRAME_KEY`. Open `http://localhost:5173/?key=<FRAME_KEY>`.
+`pnpm dev` passes the variables in `.mise.toml` (git ignores it) to the local worker. Open `http://localhost:5173/`. The dev server skips the client certificate check and listens on every interface (`server.host: true`), so anyone on the network can read the calendar while it runs.
 
 Without a calendar configuration, the worker returns sample events and the header shows "Sample events".
 
 ## Only the frame can read the calendar
 
-The worker runs first on every path (`run_worker_first: true`). A request without the key gets 404, so the page, its assets and the API all look absent. The kiosk opens `https://photoframe.lochingpo.com/?key=<FRAME_KEY>`. A valid `?key=` sets the HttpOnly cookie `frame_key`, and the page's own asset and API requests send that cookie. If `FRAME_KEY` is not set, every request gets 404.
+The frame proves itself with a TLS client certificate (mTLS). The worker runs first on every path (`run_worker_first: true`) and answers 404 unless Cloudflare reports a valid, unrevoked certificate (`request.cf.tlsClientAuth`). The page, its assets and the API all look absent to anyone else. Nothing secret travels in the URL or in a cookie.
 
-The production key is 32 random bytes in base64url. It lives in the Wrangler secret `FRAME_KEY`, in the owner's secret manager, and in `.mise.toml` (git ignores it) under `[env]`. Never commit it. To make a new key and send it to Cloudflare:
-
-```sh
-openssl rand 32 | base64 | tr '+/' '-_' | tr -d '=\n'   # put the output in .mise.toml as FRAME_KEY
-mise exec -- sh -c 'printf %s "$FRAME_KEY" | pnpm exec wrangler secret put FRAME_KEY'
-```
-
-After a new key, give the kiosk the new URL (see `device/README.md`).
+- **Certificates:** Cloudflare issues them from the account's managed CA, under **SSL/TLS → Client Certificates** for `lochingpo.com`. mTLS is on for the host `photoframe.lochingpo.com` only. To lock out a device, revoke its certificate there.
+- **New device:** make an ECDSA P-256 key and CSR on the Mac, then create a certificate with **Use my private key and CSR**. Copy the certificate PEM on the result page, because Cloudflare does not show it again. The frame's files and install command are in `device/README.md`.
+- **Other hosts:** `workers_dev` and `preview_urls` are off in `wrangler.jsonc`. On a `workers.dev` host Cloudflare asks for no certificate, so the worker would answer 404 there anyway.
 
 ## Connect Google Calendar
 

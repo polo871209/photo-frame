@@ -1,8 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { chromium } from "playwright-core";
 
-const url =
-  process.argv[2] ?? `http://localhost:5173/?key=${process.env.FRAME_KEY}`;
+const url = process.argv[2] ?? "http://localhost:5173/";
 const outDir = new URL("../screenshots/", import.meta.url).pathname;
 const views = ["Day", "4 Days", "Week", "Month", "Schedule"];
 
