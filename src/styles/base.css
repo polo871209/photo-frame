@@ -35,13 +35,44 @@ h1, h2, p { margin: 0; font-weight: inherit; }
 .screen { flex: 1; min-width: 0; height: 100%; position: relative; }
 .screen[hidden] { display: none; }
 
-.rail { flex: none; width: 56px; height: 100%; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
-.rail-btn { width: 56px; height: 56px; display: grid; place-items: center; color: var(--ink-2); }
-.rail-btn:active { background: var(--paper-2); }
-.rail-btn.is-on { background: var(--ink); color: var(--paper); }
-.rail-clock { margin-top: auto; padding-bottom: 12px; display: flex; flex-direction: column; align-items: center; }
-.rail-clock .num { font-size: 20px; line-height: 1; }
-.rail-clock .label { font-size: 11px; margin-top: 2px; }
+.menu { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 40; pointer-events: none; }
+.menu-scrim {
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+  background: rgba(17, 17, 17, .18);
+  opacity: 0; visibility: hidden; transition: opacity .16s, visibility 0s .16s;
+}
+.menu-btn {
+  position: absolute; top: 16px; right: 24px; width: var(--menu-w); height: var(--tap);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 999px; background: var(--paper-2); color: var(--ink);
+  pointer-events: auto;
+}
+.menu-btn:active { background: var(--line); }
+.menu-btn .num { font-size: 26px; line-height: 1; }
+.menu-btn .label { font-size: 13px; color: var(--ink-2); }
+.menu-btn .i { color: var(--ink-2); transition: transform .16s; }
+.menu-list {
+  position: absolute; top: 80px; right: 24px; width: 260px; padding: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--card); border-radius: 22px; box-shadow: 0 16px 40px rgba(17, 17, 17, .22);
+  transform-origin: 100% 0;
+  opacity: 0; visibility: hidden; transform: translateY(-8px) scale(.94);
+  transition: opacity .16s, transform .16s, visibility 0s .16s;
+}
+.menu-item {
+  height: 64px; padding: 0 18px; border-radius: 16px;
+  display: flex; align-items: center; gap: 16px;
+  font-size: 20px; font-weight: 800; font-family: var(--condensed); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-2);
+}
+.menu-item:active { background: var(--paper-2); }
+.menu-item.is-on { background: var(--ink); color: var(--paper); }
+.menu.is-open { pointer-events: auto; }
+.menu.is-open .menu-scrim, .menu.is-open .menu-list { opacity: 1; visibility: visible; transition-delay: 0s; }
+.menu.is-open .menu-list { transform: none; }
+.menu.is-open .menu-btn { background: var(--ink); color: var(--paper); }
+.menu.is-open .menu-btn .label, .menu.is-open .menu-btn .i { color: var(--paper); }
+.menu.is-open .menu-btn .i { transform: rotate(180deg); }
 
 .btn {
   min-height: var(--tap); padding: 0 24px;

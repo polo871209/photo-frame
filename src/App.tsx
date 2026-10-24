@@ -32,19 +32,6 @@ export function App() {
 
   return (
     <div class="stage" style={`transform:scale(${scale})`}>
-      <nav class="rail">
-        {SCREENS.map(({ id, label, icon }) => (
-          <button
-            key={id}
-            class={`rail-btn${id === screen ? " is-on" : ""}`}
-            aria-label={label}
-            onClick={() => pick(id)}
-          >
-            <Icon name={icon} size={26} />
-          </button>
-        ))}
-        <RailClock />
-      </nav>
       <main class="screen" hidden={screen !== "calendar"}>
         <Calendar />
       </main>
@@ -53,16 +40,55 @@ export function App() {
           <NowPlaying />
         </main>
       )}
+      <ScreenMenu screen={screen} onPick={pick} />
     </div>
   );
 }
 
-function RailClock() {
+function ScreenMenu({
+  screen,
+  onPick,
+}: {
+  screen: ScreenId;
+  onPick: (id: ScreenId) => void;
+}) {
+  const [open, setOpen] = useState(false);
   const { time, period } = clockParts(useNow());
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => setOpen(false), 30_000);
+    return () => clearTimeout(timer);
+  }, [open]);
+
   return (
-    <div class="rail-clock">
-      <span class="num">{time}</span>
-      {period && <span class="label">{period}</span>}
+    <div class={`menu${open ? " is-open" : ""}`}>
+      <div class="menu-scrim" onClick={() => setOpen(false)} />
+      <button
+        class="menu-btn"
+        aria-label="Screens"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <span class="num">{time}</span>
+        {period && <span class="label">{period}</span>}
+        <Icon name="down" size={20} />
+      </button>
+      <nav class="menu-list" aria-hidden={!open}>
+        {SCREENS.map(({ id, label, icon }) => (
+          <button
+            key={id}
+            class={`menu-item${id === screen ? " is-on" : ""}`}
+            tabIndex={open ? 0 : -1}
+            onClick={() => {
+              onPick(id);
+              setOpen(false);
+            }}
+          >
+            <Icon name={icon} size={26} />
+            {label}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

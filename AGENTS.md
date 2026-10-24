@@ -35,7 +35,7 @@ The frame's system time zone is `Asia/Kuala_Lumpur` (`getprop persist.sys.timezo
 
 - `worker/`: the Cloudflare Worker. It runs first on every path (`run_worker_first: true` in `wrangler.jsonc`), checks the client certificate, serves `/api/*` itself and passes everything else to the static assets.
 - `shared/`: types used by both the worker and the client. Change the API contract here first.
-- `src/App.tsx`: the stage and the rail on the left. The rail holds one icon for each screen and the clock, and it saves the open screen in `localStorage` (`frame.screen`).
+- `src/App.tsx`: the stage and the screen menu. The clock button floats at the top right of every screen, and a tap opens the list of screens. The open screen is saved in `localStorage` (`frame.screen`). Each screen gets the full 1280×800, so keep the top right `--menu-w` wide and `--tap` high free of controls.
 - `src/calendar/`: the calendar screen. `views.ts` is the one list of views and owns each view's range, step and title. `prefs.ts` keeps each device's hidden calendars, color choices and home view in `localStorage`. `SettingsSheet.tsx` edits the calendars, and the view switcher sets the home view. `layout.ts` places overlapping timed events in columns and packs all-day bars into rows.
 - `src/music/`: the music screen. It shows the track that plays on the owner's Spotify account, on any device, and the next tracks in the queue.
 - `src/styles/`: `tokens.css` (colors, fonts, sizes), `base.css` (controls shared by all screens), and one file per screen.

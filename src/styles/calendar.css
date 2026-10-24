@@ -1,5 +1,5 @@
 .cal { height: 100%; display: flex; flex-direction: column; padding: 16px 24px 0; }
-.cal-head { display: flex; align-items: center; gap: 10px; height: var(--tap); margin-bottom: 14px; flex: none; }
+.cal-head { display: flex; align-items: center; gap: 10px; height: var(--tap); margin-bottom: 14px; flex: none; padding-right: calc(var(--menu-w) + 10px); }
 .cal-title { flex: 1; min-width: 0; margin-left: 8px; font-size: 40px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-status {
   flex: none; padding: 6px 12px; border-radius: 999px;

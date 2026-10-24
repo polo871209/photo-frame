@@ -36,13 +36,18 @@ await page.click('.icon-btn[aria-label="Settings"]');
 await page.waitForSelector(".set-cal");
 await page.screenshot({ path: `${outDir}Settings.png` });
 await page.click(".sheet-head .icon-btn");
-await page.click('.rail-btn[aria-label="Music"]');
+await page.click(".menu-btn");
+await page.waitForTimeout(300);
+await page.screenshot({ path: `${outDir}Menu.png` });
+await page.click('.menu-item:text-is("Music")');
 await page.waitForSelector(".music-info");
+await page.waitForTimeout(300);
 await page.screenshot({ path: `${outDir}Music.png` });
-await page.click('.rail-btn[aria-label="Calendar"]');
+await page.click(".menu-btn");
+await page.click('.menu-item:text-is("Calendar")');
 await browser.close();
 
-console.log(`Wrote ${views.length + 3} screenshots to ${outDir}`);
+console.log(`Wrote ${views.length + 4} screenshots to ${outDir}`);
 if (errors.length) {
   console.error(errors.join("\n"));
   process.exit(1);
