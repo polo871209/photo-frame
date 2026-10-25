@@ -42,8 +42,9 @@ export function NowPlaying() {
 
   const run = (command: PlayerCommand) => {
     setCommandError(undefined);
-    sendCommand(command).then(refresh, (failure: Error) =>
-      setCommandError(failure.message),
+    sendCommand(command).then(
+      () => refresh(command),
+      (failure: Error) => setCommandError(failure.message),
     );
   };
 
@@ -118,7 +119,15 @@ export function NowPlaying() {
         {lyricsOn && (
           <LyricsView
             lyrics={lyrics}
-            positionMs={data.playedAt ? null : position}
+            playhead={
+              data.playedAt
+                ? null
+                : {
+                    progressMs: data.progressMs,
+                    at: receivedAt,
+                    playing: data.playing,
+                  }
+            }
           />
         )}
         {!lyricsOn && data.next.length > 0 && (

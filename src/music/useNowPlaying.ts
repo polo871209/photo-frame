@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import type { NowPlaying, Track } from "../../shared/spotify";
+import type { NowPlaying, PlayerCommand, Track } from "../../shared/spotify";
 
 const PLAYING_POLL_MS = 5_000;
 const IDLE_POLL_MS = 15_000;
 const TRACK_END_SLACK_MS = 800;
 const AFTER_COMMAND_MS = 700;
+// Spotify takes a few seconds to wake an inactive device, so poll fast after a command until the player shows its result.
+const SETTLE_POLL_MS = 1_500;
+const SETTLE_MAX_MS = 15_000;
 // Spotify's GET /me/player drops the track for a few seconds now and then, often at a track change.
 const LIVE_GRACE_MS = 20_000;
 const LAST_PLAYING_KEY = "frame.lastPlaying";
+const CLOCK_TOLERANCE_MS = 1_000;
 
 interface LastPlaying {
   track: Track;
@@ -17,15 +21,17 @@ interface LastPlaying {
 
 export interface NowPlayingState {
   data?: NowPlaying;
-  /** `Date.now()` when `data` arrived, to advance `progressMs` locally. */
+  /** The `Date.now()` instant at which the track stood at `data.progressMs`, to advance it locally. */
   receivedAt: number;
   error?: string;
 }
 
-/** Polls `/api/spotify`. `refresh` polls again shortly, to show the result of a player command. */
-export function useNowPlaying(): NowPlayingState & { refresh: () => void } {
+/** Polls `/api/spotify`. After a player command, `refresh` polls fast until the player shows its result. */
+export function useNowPlaying(): NowPlayingState & {
+  refresh: (command: PlayerCommand) => void;
+} {
   const [state, setState] = useState<NowPlayingState>({ receivedAt: 0 });
-  const refresh = useRef(() => {});
+  const refresh = useRef((_command: PlayerCommand) => {});
 
   useEffect(() => {
     const controller = new AbortController();
@@ -33,6 +39,11 @@ export function useNowPlaying(): NowPlayingState & { refresh: () => void } {
     let generation = 0;
     let shown: NowPlaying | undefined;
     let liveLostAt: number | undefined;
+    let clock = { at: 0, roundTripMs: Infinity };
+    let latest: string | undefined;
+    let settle:
+      | { before: string | undefined; playing: boolean; until: number }
+      | undefined;
     const schedule = (delay: number) => {
       clearTimeout(timer);
       const mine = ++generation;
@@ -40,6 +51,7 @@ export function useNowPlaying(): NowPlayingState & { refresh: () => void } {
     };
     const poll = async (mine: number) => {
       let delay = IDLE_POLL_MS;
+      const sentAt = Date.now();
       try {
         const response = await fetch("/api/spotify", {
           signal: controller.signal,
@@ -47,25 +59,15 @@ export function useNowPlaying(): NowPlayingState & { refresh: () => void } {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data: NowPlaying = await response.json();
         if (mine !== generation) return;
-        liveLostAt = isLive(data) ? undefined : (liveLostAt ?? Date.now());
+        latest = playerKey(data);
         if (
-          isLive(shown) &&
-          liveLostAt !== undefined &&
-          Date.now() - liveLostAt < LIVE_GRACE_MS
+          settle &&
+          latest !== settle.before &&
+          data.playing === settle.playing
         ) {
-          schedule(PLAYING_POLL_MS);
-          return;
+          settle = undefined;
         }
-        rememberPlaying(data);
-        shown = withLastPlaying(data);
-        setState({ data: shown, receivedAt: Date.now() });
-        if (data.playing && data.track) {
-          const left = data.track.durationMs - data.progressMs;
-          delay = Math.max(
-            1_000,
-            Math.min(PLAYING_POLL_MS, left + TRACK_END_SLACK_MS),
-          );
-        }
+        delay = show(data, sentAt, Date.now());
       } catch (error) {
         if (controller.signal.aborted || mine !== generation) return;
         setState((previous) => ({
@@ -73,9 +75,59 @@ export function useNowPlaying(): NowPlayingState & { refresh: () => void } {
           error: (error as Error).message,
         }));
       }
+      if (settle && Date.now() < settle.until) {
+        delay = Math.min(delay, SETTLE_POLL_MS);
+      }
       schedule(delay);
     };
-    refresh.current = () => schedule(AFTER_COMMAND_MS);
+    /** Shows `data` and returns the delay before the next poll. */
+    const show = (
+      data: NowPlaying,
+      sentAt: number,
+      receivedAt: number,
+    ): number => {
+      liveLostAt = isLive(data) ? undefined : (liveLostAt ?? Date.now());
+      if (
+        isLive(shown) &&
+        liveLostAt !== undefined &&
+        Date.now() - liveLostAt < LIVE_GRACE_MS
+      ) {
+        return PLAYING_POLL_MS;
+      }
+      rememberPlaying(data);
+      const next = withLastPlaying(data);
+      // Spotify read the position somewhere inside the round trip, so the midpoint is off by at most half of it.
+      const reading = {
+        at: (sentAt + receivedAt) / 2,
+        roundTripMs: receivedAt - sentAt,
+      };
+      const expected = shown && shown.progressMs + (reading.at - clock.at);
+      const keepClock =
+        sameTrackPlaying(shown, next) &&
+        reading.roundTripMs >= clock.roundTripMs &&
+        Math.abs(expected! - next.progressMs) < CLOCK_TOLERANCE_MS;
+      if (keepClock) {
+        shown = { ...next, progressMs: shown!.progressMs };
+      } else {
+        shown = next;
+        clock = reading;
+      }
+      setState({ data: shown, receivedAt: clock.at });
+      if (!data.playing || !data.track) return IDLE_POLL_MS;
+      const left = data.track.durationMs - data.progressMs;
+      return Math.max(
+        1_000,
+        Math.min(PLAYING_POLL_MS, left + TRACK_END_SLACK_MS),
+      );
+    };
+    refresh.current = (command) => {
+      settle = {
+        before: latest,
+        playing: command.action !== "pause",
+        until: Date.now() + SETTLE_MAX_MS,
+      };
+      schedule(AFTER_COMMAND_MS);
+    };
     schedule(0);
     return () => {
       controller.abort();
@@ -83,7 +135,24 @@ export function useNowPlaying(): NowPlayingState & { refresh: () => void } {
     };
   }, []);
 
-  return { ...state, refresh: () => refresh.current() };
+  return { ...state, refresh: (command) => refresh.current(command) };
+}
+
+function playerKey(data: NowPlaying): string {
+  return [data.track?.uri, data.playing, data.playedAt].join("|");
+}
+
+function sameTrackPlaying(
+  before: NowPlaying | undefined,
+  after: NowPlaying,
+): boolean {
+  return (
+    !!before?.playing &&
+    after.playing &&
+    isLive(before) &&
+    isLive(after) &&
+    before.track!.uri === after.track!.uri
+  );
 }
 
 function isLive(data: NowPlaying | undefined): boolean {
