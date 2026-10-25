@@ -109,7 +109,6 @@ ${wind}
 ${billboard}
 uniform float uGrow;
 uniform float uGrowWidth;
-uniform float uBlow;
 uniform float uLeafScale;
 uniform float uRegrow;
 uniform float uShape;
@@ -135,17 +134,13 @@ float easeOutBack(float x) {
   return 1.0 + 2.9 * y * y * y + 1.9 * y * y;
 }
 
-float hash11(float n) {
-  return fract(sin(n) * 43758.5453);
-}
-
 void main() {
   float size = iData.x * uLeafScale;
   float angle = iData.y;
   float rnd = iData.z;
   float arrival = iData.w;
 
-  float grown = uBlow > 0.0 ? 1.0 : clamp((uGrow * (1.0 + uGrowWidth) - arrival) / uGrowWidth, 0.0, 1.0);
+  float grown = clamp((uGrow * (1.0 + uGrowWidth) - arrival) / uGrowWidth, 0.0, 1.0);
   size *= grown > 0.0 ? easeOutBack(grown) : 0.0;
 
   vec3 along = vec3(uWindDir.x, 0.0, uWindDir.y);
@@ -154,14 +149,6 @@ void main() {
   vec3 p = iPos + windOffset(iPos);
   angle += sin(t * (2.6 + rnd * 2.2) + rnd * 40.0) * 0.22 * uWind;
   p += along * sin(t * (3.1 + rnd * 1.7) + rnd * 17.0) * 0.025 * uWind;
-
-  float lead = clamp(0.5 - dot(iPos, along) * 0.12, 0.0, 1.0);
-  float blow = clamp((uBlow - rnd * 0.32 - lead * 0.22) / 0.46, 0.0, 1.0);
-  vec3 scatter = vec3(hash11(rnd * 91.0) - 0.5, hash11(rnd * 37.0) - 0.35, hash11(rnd * 53.0) - 0.5);
-  p += along * (7.0 + rnd * 7.0) * blow * blow + scatter * 5.0 * blow;
-  p += (vec3(0.0, sin(blow * 3.0 + rnd * 9.0) * 0.6, 0.0) + across * sin(blow * 5.0 + rnd * 20.0) * 0.8) * blow;
-  angle += blow * (5.0 + rnd * 9.0);
-  size *= 1.0 - smoothstep(0.6, 1.0, blow);
 
   float since = uTime - iGone;
   size *= since < 0.0 ? 1.0 : since < uRegrow ? 0.0 : easeOutBack(clamp((since - uRegrow) / 0.5, 0.0, 1.0));

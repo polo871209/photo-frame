@@ -54,9 +54,6 @@ export function Garden({ interactive }: { interactive: boolean }) {
               </button>
             ))}
           </div>
-          <div class="seg">
-            <button onClick={() => scene.current?.newTree()}>New tree</button>
-          </div>
         </div>
       )}
     </div>

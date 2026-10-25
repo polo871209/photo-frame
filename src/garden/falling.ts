@@ -182,13 +182,6 @@ export class FallingLeaves {
     return moved;
   }
 
-  clear(): void {
-    for (let i = 0; i < this.capacity; i++) this.timing.setX(i, DEAD);
-    this.restFrom.fill(DEAD);
-    this.restUntil.fill(DEAD);
-    this.touch(0, this.capacity - 1);
-  }
-
   flush(): void {
     if (this.dirtyTo < 0) return;
     const slots = this.dirtyTo - this.dirtyFrom + 1;

@@ -87,10 +87,11 @@ The worker reads the owner's playback through the Spotify Web API (`worker/spoti
 
 `src/garden/scene.ts` draws the tree with WebGL2 and custom GLSL3 shaders. `looks.ts` holds muted colors for each season, and the ground comes from Catppuccin Latte or Macchiato, so the garden follows the dark mode. A theme change while the garden shows plays the same wipe as a season change.
 
-- The garden screen has buttons for the four seasons and a new tree. The season is saved in `localStorage` (`frame.season`). A touch on the leaves knocks them down, and a drag on the ground turns the view.
+- The garden screen has buttons for the four seasons. The season is saved in `localStorage` (`frame.season`). A touch on the leaves knocks them down, and a drag on the ground turns the view.
 - The screensaver shows the garden without controls after 3 min with no touch (`isIdle`), on every screen except music and the garden itself. A tap closes it. `screensaver` in `FrameSettings` turns it on or off, and so does the "Screensaver" toggle in the device settings.
 - The scene draws at most 30 frames per second and stops while the page is hidden. The garden unmounts while the screen is off, which frees its WebGL context.
-- The frame's GPU is a Mali-G31. To keep it fast, the shadow map is 1024 px with 8 samples, and the render targets use 8-bit color. Look at the garden on the frame (`pnpm frame screenshot`) after each change to `scene.ts` or `shaders.ts`.
+- The frame's Mali-G31 GPU limits the garden by fill rate. At full resolution it drew 8 frames per second. So the scene renders at 60% resolution (`RENDER_SCALE`) without MSAA, grows the tree at half the leaf density, and uses a 512 px shadow map that updates every second frame, with 4 samples for the ground and 1 for leaves.
+- After each change to `scene.ts` or `shaders.ts`, measure the frame rate on the frame with the garden open. Run `mise exec -- adb shell 'dumpsys gfxinfo com.wesbos.homehq reset; sleep 10; dumpsys gfxinfo com.wesbos.homehq'` and divide "Total frames rendered" by 10. `pnpm frame screenshot` does not capture WebGL, so look at the garden with `mise exec -- adb exec-out screencap -p > screenshots/frame.png`.
 - `pnpm screenshots` needs WebGL in headless Chrome, so it starts Chrome with `--enable-unsafe-swiftshader`.
 
 ## Style comes from the old dashboard

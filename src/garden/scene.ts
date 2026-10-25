@@ -7,7 +7,6 @@ import {
   DoubleSide,
   Float32BufferAttribute,
   GLSL3,
-  Group,
   LessEqualCompare,
   LinearFilter,
   LinearSRGBColorSpace,
@@ -49,7 +48,7 @@ import {
 import { createRng } from "./rng";
 import type { Season } from "./seasons";
 import * as glsl from "./shaders";
-import { growTree, type Tree } from "./tree";
+import { growTree } from "./tree";
 
 const WIND = 0.5;
 const WIND_SPEED = 1;
@@ -59,12 +58,11 @@ const SUN_HEIGHT = 19;
 const SHADOW_SIZE = 512;
 const SHADOW_EVERY = 2;
 const RENDER_SCALE = 0.6;
-const LEAF_SCALE = 0.16;
+const LEAF_SCALE = 0.19;
 const REGROW_AFTER = 18;
 const REST_TIME = 60;
 const AMBIENT_PER_SECOND = 15.5;
 const GROW_TIME = 1.7;
-const BLOW_TIME = 0.55;
 const WIPE_TIME = 0.85;
 const TILT = 11;
 const FALL_CAPACITY = 2000;
@@ -78,7 +76,6 @@ export interface GardenOptions {
 
 export interface GardenScene {
   setLook(season: Season, theme: Theme): void;
-  newTree(): void;
   dispose(): void;
 }
 
@@ -153,7 +150,6 @@ export function createGarden(
     uTreeHeight: { value: 5 },
     uGrow: { value: 0 },
     uGrowWidth: { value: 0.12 },
-    uBlow: { value: 0 },
     uShadowMatrix: { value: new Matrix4() },
     uShadowMap: { value: depth },
     uShadowRadius: { value: (2.2 * 1.4) / SHADOW_SIZE },
@@ -181,7 +177,6 @@ export function createGarden(
     ...shared,
     uWind: { value: 0 },
     uGrow: { value: 1 },
-    uBlow: { value: 0 },
     uLeafScale: { value: 0.15 },
     uShape: { value: 0 },
     uDabShare: { value: 1 },
@@ -325,10 +320,6 @@ export function createGarden(
   );
   scene.add(ground);
 
-  const treeGroup = new Group();
-  const treeCasters = new Group();
-  scene.add(treeGroup);
-  casters.add(treeCasters);
 
   const twin = (
     geometry: BufferGeometry,
@@ -342,39 +333,26 @@ export function createGarden(
     return { visible, caster };
   };
 
-  let seed = 7;
-  let tree: Tree;
-  let gone: Float32Array = new Float32Array(0);
-  let goneAttribute: { needsUpdate: boolean } | null = null;
+  const seed = 7;
   const mound: MoundShape = { radius: 1.8, height: 0.32 };
 
-  const buildTree = () => {
-    for (const mesh of treeGroup.children) (mesh as Mesh).geometry.dispose();
-    treeGroup.clear();
-    treeCasters.clear();
-    tree = growTree({
-      seed,
-      size: 1,
-      spread: 1,
-      gnarl: 1,
-      lean: 0,
-      density: 1,
-    });
-    const bark = twin(
-      createBarkGeometry(tree),
-      barkMaterial,
-      barkDepthMaterial,
-    );
-    tree.leaves.sort(frontFirst);
-    const leaves = createLeafGeometry(tree.leaves);
-    const crown = twin(leaves, crownMaterial, crownDepthMaterial);
-    treeGroup.add(bark.visible, crown.visible);
-    treeCasters.add(bark.caster, crown.caster);
-    const goneBuffer = leaves.getAttribute("iGone");
-    gone = goneBuffer.array as Float32Array;
-    goneAttribute = goneBuffer;
-    shared.uTreeHeight.value = Math.max(2, tree.bounds.max.y);
-  };
+  const tree = growTree({
+    seed,
+    size: 1,
+    spread: 1,
+    gnarl: 1,
+    lean: 0,
+    density: 0.5,
+  });
+  tree.leaves.sort(frontFirst);
+  const bark = twin(createBarkGeometry(tree), barkMaterial, barkDepthMaterial);
+  const leaves = createLeafGeometry(tree.leaves);
+  const crown = twin(leaves, crownMaterial, crownDepthMaterial);
+  scene.add(bark.visible, crown.visible);
+  casters.add(bark.caster, crown.caster);
+  const goneAttribute = leaves.getAttribute("iGone");
+  const gone = goneAttribute.array as Float32Array;
+  shared.uTreeHeight.value = Math.max(2, tree.bounds.max.y);
 
   const gardenRng = createRng(7919 * seed + 13);
   const moundMesh = twin(
@@ -408,7 +386,6 @@ export function createGarden(
   groundUniforms.uRakeRadius.value = 1.02 * mound.radius;
   shared.uMoundRadius.value = mound.radius;
   shared.uMoundHeight.value = mound.height;
-  buildTree();
 
   const falling = new FallingLeaves(FALL_CAPACITY, mound, createRng(777));
   const fallMesh = new Mesh(falling.geometry, fallMaterial);
@@ -451,8 +428,6 @@ export function createGarden(
   let time = 0;
   let growth = 0;
   let growing = true;
-  let blowing = false;
-  let blow = 0;
   let ambientDebt = 0;
   let primed = false;
   const AMBIENT_WARMUP = 12;
@@ -593,7 +568,7 @@ export function createGarden(
       gone[index] = time;
       dropped++;
     }
-    if (dropped && goneAttribute) goneAttribute.needsUpdate = true;
+    if (dropped) goneAttribute.needsUpdate = true;
     return dropped;
   };
 
@@ -672,7 +647,7 @@ export function createGarden(
     dy: number,
     seconds: number,
   ) => {
-    if (growing || blowing) return;
+    if (growing) return;
     aim(clientX, clientY);
     const hit = hitLeaf();
     const speed = Math.hypot(dx, dy) / Math.max(seconds, 1 / 240);
@@ -704,7 +679,7 @@ export function createGarden(
   };
 
   const gust = (clientX: number, clientY: number) => {
-    if (growing || blowing) return;
+    if (growing) return;
     aim(clientX, clientY);
     const hit = hitLeaf();
     const windward = new Vector3(WIND_DIR.x, 0.25, WIND_DIR.y).normalize();
@@ -746,7 +721,7 @@ export function createGarden(
     lastY = event.clientY;
     lastMoveAt = performance.now();
     let onLeaves = false;
-    if (event.pointerType !== "mouse" && !growing && !blowing) {
+    if (event.pointerType !== "mouse" && !growing) {
       aim(event.clientX, event.clientY);
       onLeaves = hitLeaf() !== null;
     }
@@ -816,19 +791,6 @@ export function createGarden(
       spawnAmbient(AMBIENT_PER_SECOND * AMBIENT_WARMUP, AMBIENT_WARMUP);
   };
 
-  const newTree = () => {
-    if (blowing) return;
-    seed = 1 + Math.floor(Math.random() * 999);
-    blowing = true;
-    blow = 0;
-    sweep(
-      new Vector3(),
-      60,
-      new Vector3(WIND_DIR.x, 0, WIND_DIR.y).multiplyScalar(4.5),
-      FALL_CAPACITY,
-    );
-  };
-
   const update = (dt: number) => {
     time += dt;
     shared.uTime.value = time;
@@ -837,34 +799,16 @@ export function createGarden(
       spinVelocity *= 0.9;
       if (Math.abs(spinVelocity) < 0.001) spinVelocity = 0;
     }
-    if (blowing) {
-      blow += dt / BLOW_TIME;
-      shared.uBlow.value = Math.min(1, blow);
-      shared.uGrow.value = Math.max(
-        0,
-        1 - easeInOutCubic(MathUtils.clamp((blow - 0.3) / 0.62, 0, 1)),
-      );
-      if (blow >= 1) {
-        blowing = false;
-        buildTree();
-        falling.clear();
-        primed = false;
-        shared.uBlow.value = 0;
-        growth = 0;
-        growing = true;
-      }
-    } else if (growing) {
+    if (growing) {
       growth = Math.min(1, growth + dt / GROW_TIME);
       if (growth >= 1) growing = false;
       shared.uGrow.value = 1 - Math.pow(1 - growth, 1.8);
     }
-    if (!primed && !blowing && growth >= 0.7) {
+    if (!primed && growth >= 0.7) {
       spawnAmbient(AMBIENT_PER_SECOND * AMBIENT_WARMUP, AMBIENT_WARMUP);
       primed = true;
     }
-    fallUniforms.uFade.value = blowing
-      ? Math.max(0, 1 - 2 * blow)
-      : MathUtils.clamp((growth - 0.7) / 0.3, 0, 1);
+    fallUniforms.uFade.value = MathUtils.clamp((growth - 0.7) / 0.3, 0, 1);
     if (incoming) {
       wipe += dt / WIPE_TIME;
       if (wipe >= 1) {
@@ -873,7 +817,7 @@ export function createGarden(
         wipe = 0;
       }
     }
-    if (primed && !blowing) {
+    if (primed) {
       ambientDebt += dt * AMBIENT_PER_SECOND;
       const count = Math.floor(ambientDebt);
       ambientDebt -= count;
@@ -962,7 +906,6 @@ export function createGarden(
 
   return {
     setLook,
-    newTree,
     dispose() {
       cancelAnimationFrame(frame);
       renderer.forceContextLoss();
