@@ -70,7 +70,14 @@ const COMMANDS = {
   [string, string]
 >;
 
+const RECENT_MAX_AGE_MS = 5 * 60_000;
+const DEFAULT_RETRY_AFTER_S = 60;
+
 let cachedToken: { value: string; expiresAt: number } | undefined;
+let cachedRecent:
+  | { value: RecentlyPlayed | null; expiresAt: number }
+  | undefined;
+const retryAtByEndpoint = new Map<string, number>();
 
 export async function handleSpotify(
   request: Request,
@@ -127,7 +134,7 @@ async function nowPlaying(
   const token = await accessToken(credentials);
   const [state, queue] = await Promise.all([
     getJson<PlaybackState>("/me/player?additional_types=episode", token),
-    getJson<Queue>("/me/player/queue", token),
+    getJson<Queue>("/me/player/queue", token).catch(logAndSkip),
   ]);
   const next = (queue?.queue ?? [])
     .filter((item) => item !== null)
@@ -144,11 +151,7 @@ async function nowPlaying(
       next,
     };
   }
-  const recent = await getJson<RecentlyPlayed>(
-    "/me/player/recently-played?limit=1",
-    token,
-  );
-  const last = recent?.items[0];
+  const last = (await lastPlayed(token))?.items[0];
   return {
     source: "spotify",
     track: last ? toTrack(last.track) : null,
@@ -158,6 +161,24 @@ async function nowPlaying(
     playedAt: last?.played_at ?? null,
     next,
   };
+}
+
+// Spotify gives recently-played a small daily quota and then answers 429 for hours, so ask it at most every few minutes.
+async function lastPlayed(token: string): Promise<RecentlyPlayed | null> {
+  if (cachedRecent && Date.now() < cachedRecent.expiresAt) {
+    return cachedRecent.value;
+  }
+  const value = await getJson<RecentlyPlayed>(
+    "/me/player/recently-played?limit=1",
+    token,
+  ).catch(logAndSkip);
+  cachedRecent = { value, expiresAt: Date.now() + RECENT_MAX_AGE_MS };
+  return value;
+}
+
+function logAndSkip(error: unknown): null {
+  console.error(error);
+  return null;
 }
 
 function sampleTrack(title: string, artists: string, minutes: number): Track {
@@ -291,7 +312,7 @@ async function recentContexts(token: string): Promise<Suggestion[]> {
   const recent = await getJson<RecentlyPlayed>(
     "/me/player/recently-played?limit=50",
     token,
-  );
+  ).catch(logAndSkip);
   const contexts = new Map<string, Suggestion>();
   const albums = new Map<string, Suggestion>();
   for (const { context, track } of recent?.items ?? []) {
@@ -514,7 +535,19 @@ async function send(
 }
 
 async function getJson<T>(path: string, token: string): Promise<T | null> {
+  const endpoint = path.replace(/\?.*/, "");
+  const retryAt = retryAtByEndpoint.get(endpoint) ?? 0;
+  if (Date.now() < retryAt) {
+    throw new Error(
+      `Spotify ${endpoint} rate-limited until ${new Date(retryAt).toISOString()}`,
+    );
+  }
   const response = await send("GET", path, token);
+  if (response.status === 429) {
+    const seconds =
+      Number(response.headers.get("Retry-After")) || DEFAULT_RETRY_AFTER_S;
+    retryAtByEndpoint.set(endpoint, Date.now() + seconds * 1000);
+  }
   if (!response.ok) throw new Error(`Spotify ${path} HTTP ${response.status}`);
   // Spotify answers 204 with no body when no device is active.
   if (response.status === 204) return null;

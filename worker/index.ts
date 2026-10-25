@@ -1,7 +1,11 @@
 import { COMMAND_SHAPES, parseCommand } from "../shared/control";
-import type { CalendarInfo, EventsResponse } from "../shared/events";
+import type {
+  CalendarEvent,
+  CalendarInfo,
+  EventsResponse,
+} from "../shared/events";
 import type { FrameControl } from "./control";
-import { expandIcs } from "./ics";
+import { expandIcs, nearEvents } from "./ics";
 import { sampleEvents, SAMPLE_CALENDARS } from "./sample";
 import { handleSpotify, type SpotifyCredentials } from "./spotify";
 import { weatherReport } from "./weather";
@@ -99,7 +103,7 @@ async function handleApi(
 
   const calendars = readCalendars(env);
   const body: EventsResponse = calendars.length
-    ? await googleEvents(calendars, from, to)
+    ? await googleEvents(calendars, from, to, url.origin)
     : {
         source: "sample",
         calendars: SAMPLE_CALENDARS,
@@ -198,6 +202,7 @@ async function googleEvents(
   calendars: CalendarConfig[],
   from: Date,
   to: Date,
+  origin: string,
 ): Promise<EventsResponse> {
   const results = await Promise.all(
     calendars.map(async (calendar) => {
@@ -206,7 +211,13 @@ async function googleEvents(
           cf: { cacheTtl: 30, cacheEverything: true },
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return expandIcs(await response.text(), calendar.id, from, to);
+        return await cachedExpansion(
+          nearEvents(await response.text(), from, to),
+          calendar.id,
+          from,
+          to,
+          origin,
+        );
       } catch (error) {
         console.error(`calendar "${calendar.name}" failed:`, error);
         return null;
@@ -221,4 +232,35 @@ async function googleEvents(
       .filter((_, index) => results[index] === null)
       .map((calendar) => calendar.name),
   };
+}
+
+// The Free plan stops a request after 10 ms of CPU, and expansion takes more, so expand only when the events change.
+async function cachedExpansion(
+  ics: string,
+  calendarId: string,
+  from: Date,
+  to: Date,
+  origin: string,
+): Promise<CalendarEvent[]> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(ics),
+  );
+  const hash = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  const key = new Request(
+    `${origin}/api/events/expanded/${calendarId}/${hash}?${new URLSearchParams({
+      from: from.toISOString(),
+      to: to.toISOString(),
+    })}`,
+  );
+  const cached = await caches.default.match(key);
+  if (cached) return cached.json();
+  const expanded = expandIcs(ics, calendarId, from, to);
+  await caches.default.put(
+    key,
+    Response.json(expanded, { headers: { "Cache-Control": "max-age=86400" } }),
+  );
+  return expanded;
 }
