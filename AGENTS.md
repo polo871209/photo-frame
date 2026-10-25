@@ -19,7 +19,7 @@ The frame is an HY-S101 (Rockchip RK3326, Android 8.1 Go, about 976 MB RAM, 32-b
 - **Browser:** Android System WebView 106. `vite.config.ts` sets `build.target: chrome106` and `cssTarget: chrome61`. Keep `cssTarget` at `chrome61`, because WebView 106 rejects the 4- and 8-digit hex colors that newer targets let the minifier write.
 - **CSS:** write flat CSS. Use `rgb(var(--c-rgb) / .12)` for tints. Nesting, `color-mix()`, `oklch()` and `dvh` units do not work in WebView 106.
 - **Screen:** 1280×800 at 160 dpi, touch only. `src/App.tsx` draws a fixed 1280×800 `.stage` and scales it to the window, so lay out in fixed pixels for that size. Hover states never show. Tap targets are at least `--tap` (52px).
-- **Memory and CPU:** the frame is slow. Keep the bundle small (now 47 KB JS, 17 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time.
+- **Memory and CPU:** the frame is slow. Keep the bundle small (now 49 KB JS, 18 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time.
 - **Unattended:** nobody presses reload. Every fetch must fail soft and retry on the next refresh. `index.html` reloads the page if the bundle did not mount within 10 s.
 
 ## Time zone follows the system
@@ -113,7 +113,7 @@ An untouched frame runs the new version within about 15 s of the deploy. Keep th
 
 The worker serves every file under `/assets/` with `Cache-Control: private, max-age=31536000, immutable`, so the frame fetches only the files whose content hash changed. Add files there only through imports that Vite hashes, never through `public/assets/`.
 
-If the change is to the kiosk APK itself and the frame is on ADB, install the APK as section 7 of `device/README.md` describes. If the frame is not on ADB, tell the owner that the frame still runs the old APK.
+If the change is to the kiosk APK itself, install the APK as section 7 of `device/README.md` describes. ADB reaches the frame over Wi-Fi after `mise exec -- adb connect 192.168.68.73:5555` (section 8). If that fails and no USB cable is in, tell the owner that the frame still runs the old APK.
 
 Ask the owner before you change `CALENDARS` in production with `wrangler secret put`.
 
@@ -121,13 +121,14 @@ After you change `wrangler.jsonc`, run `pnpm types` to regenerate `worker-config
 
 ## Push commands to the frame
 
-The frame keeps a WebSocket open to `/api/control`, and the `FrameControl` Durable Object (`worker/control.ts`) pushes each command to it at once. Commands change only the page and the kiosk window, so they need no question to the owner. Push them from the Mac with `pnpm frame`:
+The frame keeps a WebSocket open to `/api/control`, and the `FrameControl` Durable Object (`worker/control.ts`) pushes each command to it at once. Commands change only the page, the kiosk app and the backlight, so they need no question to the owner. Push them from the Mac with `pnpm frame`:
 
 - `pnpm frame status` prints the settings and `frames`, the number of open WebSockets. `frames: 0` means that the frame is offline or reconnecting.
-- `pnpm frame screen off` shows a black screen and sets the backlight to its lowest level (17 of 255 in sysfs, not fully dark). `pnpm frame screen on` undoes it, and so does a tap on the black screen. The setting survives reloads and deploys.
-- `pnpm frame show calendar`, `pnpm frame show music` or `pnpm frame show weather` opens a screen.
-- `pnpm frame reload` reloads the page at once.
+- `pnpm frame screen off` shows a black screen and powers the backlight off. `pnpm frame screen on` undoes it, and so does a tap on the black screen. `pnpm frame brightness 1-100` sets the backlight while the screen is on, and `pnpm frame volume 0-100` sets the media volume. These settings survive reloads and deploys.
+- `pnpm frame show calendar|music|weather` opens a screen. `pnpm frame reload` reloads the page at once, and `pnpm frame restart` restarts the kiosk app, which also drops WebView's TLS sessions. The kiosk restarts itself every night at 04:00.
+- `pnpm frame chimes on|off` turns the chime 5 min before each timed event on or off (`src/calendar/useChimes.ts`). Chimes are silent while the screen is off. `pnpm frame chime` plays one chime to test the speaker.
+- `pnpm frame screenshot` saves what the frame shows to `screenshots/frame-<time>.jpg`, through `/api/control/screenshot`.
 
 The script sends the frame's client certificate from `~/.config/photo-frame/mtls/`. `FRAME_URL=http://localhost:5173 pnpm frame …` targets `pnpm dev`.
 
-To add a command, add it to `FrameCommand` and `parseCommand` in `shared/control.ts`, then handle it in `useFrameControl.ts`. Keep state that must survive a reconnect in `FrameSettings`, because the worker sends it on every connect. The backlight goes through `window.HomeHQ.setBacklight`, which the kiosk adds from version 1.2-mtls (`device/homehq.patch`). In a desktop browser, `screen off` shows only the black screen.
+To add a command, add it to `FrameCommand` and `parseCommand` in `shared/control.ts`, then handle it in `useFrameControl.ts`. Keep state that must survive a reconnect in `FrameSettings`, because the worker sends it on every connect. Backlight, volume, restart and screenshot go through `window.Kiosk`, which the kiosk adds from version 1.4-mtls (`device/homehq.patch`). In a desktop browser, `screen off` shows only the black screen, `restart` reloads the page, and `screenshot` gets no answer.

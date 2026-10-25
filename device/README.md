@@ -26,9 +26,14 @@ These come from the upstream repo's [rules we learned the hard way](https://gith
 | Build flags                | `ro.debuggable=0`, `ro.adb.secure=1`, SELinux permissive, verified boot `orange`, `ro.boot.flash.locked=0` |
 | RAM                        | 976,868 kB, with a 360 MB `zram0` swap                                                                     |
 | Screen                     | 1280×800 at 160 dpi, touch                                                                                 |
+| Backlight                  | PWM, `/sys/class/backlight/backlight`, `max_brightness` 255. `bl_power` 4 turns it off (duty 0 ns)         |
+| Sensors                    | Accelerometer only. No light sensor (`dumpsys sensorservice`)                                              |
+| Audio                      | RK809 codec, one speaker. Media volume 5 of 15. No working microphone (see below the table)                |
 | Storage                    | Logical NAND `/dev/block/rknand0`, 60,555,264 sectors of 512 bytes                                         |
 | WebView                    | `com.android.webview` 106.0.5249.126 in `/system/app/webview`                                              |
 | Time zone                  | `Asia/Kuala_Lumpur`, automatic time zone off                                                               |
+
+The frame has no working microphone. Android declares no `android.hardware.microphone`. The codec has a capture device (`pcmC0D0c`), and the stock audio policy lists `AUDIO_DEVICE_IN_BUILTIN_MIC`, but on 2026-10-25 `tinycap` recorded 3 s of exact zeros on both channels with `Capture MIC Path` set to `MIC OFF`, `Main Mic` and `Hands Free Mic`. A connected microphone, or even an open ADC input, gives noise. The path was set back to `MIC OFF`.
 
 The board and partition map are the same as the Akimart ZN-DP1002 in the upstream repo, but the firmware is different.
 
@@ -303,11 +308,16 @@ To set the time zone, open Android Settings → System → Date & time, turn off
 
 ## 7. Home HQ kiosk as Home
 
-Home HQ is the kiosk app from `dashboard/kiosk` in `wesbos/photo-frame-dashboard`. It shows `https://photoframe.lochingpo.com/` full screen in WebView 106, retries every 5 s when the page fails to load, and opens native controls on a two-finger hold of 1.5 s. Its README lists every feature. Our build adds the client certificate and `window.HomeHQ.setBacklight(on)`, which `pnpm frame screen off` uses (see `AGENTS.md`).
+Home HQ is the kiosk app from `dashboard/kiosk` in `wesbos/photo-frame-dashboard`. It shows `https://photoframe.lochingpo.com/` full screen in WebView 106, retries every 5 s when the page fails to load, and opens native controls on a two-finger hold of 1.5 s. Its README lists every feature. Our build adds the client certificate, the `window.Kiosk` bridge that `pnpm frame` uses (see `AGENTS.md`), and a restart of the kiosk process every night at 04:00 local time.
 
 ### Build
 
-The APK was built on 2026-10-24 from upstream commit `f1e0820` with `homehq.patch` from this folder applied. The patch adds the TLS client certificate (see [Client certificate](#client-certificate)) and the `HomeHQ.setBacklight` JavaScript bridge, and sets the version to 1.2-mtls (version code 4). Build-tools 37.0.0 and platform 37.2 come from `sdkmanager`, and JDK Temurin 17 comes from mise. Upstream's `build.sh` hard-codes platform 34, so the build uses a copy with the platform path changed:
+The APK was built on 2026-10-25 from upstream commit `f1e0820` with `homehq.patch` from this folder applied. The patch adds the TLS client certificate (see [Client certificate](#client-certificate)), the nightly restart, and the `window.Kiosk` JavaScript bridge, and sets the version to 1.4-mtls (version code 6). The bridge has four methods:
+
+- `setBrightness(level)` sets the window brightness. At 0 it also writes 4 to `bl_power` through `/system/xbin/su 0`, because window brightness 0 still leaves the panel at the firmware minimum (17 of 255). Any level above 0 writes 0 back, and so does every start of the kiosk.
+- `setVolume(level)` sets the media volume (`STREAM_MUSIC`, 15 steps), which WebView audio plays at. It needs no permission.
+- `restart()` sets an alarm that starts the kiosk again, then kills its own process.
+- `screenshot()` draws the window into a 1280×800 JPEG (about 40 KB, 300 ms) and sends it back to the page as a `kiosk-screenshot` event. Build-tools 37.0.0 and platform 37.2 come from `sdkmanager`, and JDK Temurin 17 comes from mise. Upstream's `build.sh` hard-codes platform 34, so the build uses a copy with the platform path changed:
 
 ```sh
 git clone https://github.com/wesbos/photo-frame-dashboard.git && cd photo-frame-dashboard
@@ -318,14 +328,16 @@ sed 's#platforms/android-34/#platforms/android-37.2/#' dashboard/kiosk/build.sh 
 mise exec java@temurin-17 -- env BUILD_TOOLS=$ANDROID_HOME/build-tools/37.0.0 bash dashboard/kiosk/build-latest.sh
 ```
 
-The result is `com.wesbos.homehq` 1.2-mtls (version code 4), minSdk 23, targetSdk 28, signed with APK Signature Scheme v2 and v3. Its SHA-256 was `fde5d459919a46d082c9d548d58a13b0f7b33b233662126fdf68aa1c8fe7046f`. It was installed with `adb install -r` on 2026-10-24 and replaced these builds:
+The result is `com.wesbos.homehq` 1.4-mtls (version code 6), minSdk 23, targetSdk 28, signed with APK Signature Scheme v2 and v3. Its SHA-256 was `771a2c2570a56e608c59b28b34816034aadda34a327dd62feb352c8d07e70427`. It was installed with `adb install -r` over Wi-Fi on 2026-10-25 and replaced these builds:
 
 | Version  | Code | SHA-256                                                            | Patch                                                       |
 | -------- | ---- | ------------------------------------------------------------------ | ----------------------------------------------------------- |
+| 1.3-mtls | 5    | `2651aa8368184252548cf9bf10371a2f3a77d903e3225ba672b7303edf5e816c` | `homehq.patch` without `setVolume`, never committed         |
+| 1.2-mtls | 4    | `fde5d459919a46d082c9d548d58a13b0f7b33b233662126fdf68aa1c8fe7046f` | `homehq.patch` at commit `56228c1`                          |
 | 1.1-mtls | 3    | `f9c77bc545de2c0821e4cf7f2426f239fb92ca0ef6e67c8e635f9aaaad80b81b` | `homehq-client-cert.patch`, in git history before this file |
 | 1.1      | 2    | `c1633c68785b9d479543fbff976ad3c6af5b488a26920ff738cf655d3e8c02de` | none                                                        |
 
-To undo the bridge, build 1.1-mtls with the patch from `git show 599a484:device/homehq-client-cert.patch`, and install it with `adb install -r -d`. Without the bridge, `pnpm frame screen off` shows a black screen at full backlight. targetSdk stays at 28 because a higher target changes nothing on Android 8.1, and upstream says that 30 and higher need manifest changes.
+To undo 1.4-mtls, build 1.2-mtls with the patch from `git show 56228c1:device/homehq.patch`, and install it with `adb install -r -d`. The page then finds no `window.Kiosk`, so `pnpm frame screen off` shows a black screen at full backlight, and the brightness, volume, restart and screenshot controls do nothing. If the panel stays dark with the kiosk gone, run `mise exec -- adb shell "su 0 sh -c 'echo 0 > /sys/class/backlight/backlight/bl_power'"`, or reboot. targetSdk stays at 28 because a higher target changes nothing on Android 8.1, and upstream says that 30 and higher need manifest changes.
 
 The APK is signed with `~/.android/debug.keystore` on the Mac that built it. An update with `adb install -r` must be signed with the same key. With another key, uninstall first.
 
@@ -376,6 +388,20 @@ The kiosk checks that the key matches the certificate, then saves both in its ap
 If the frame shows "Not found" with a valid certificate saved, restart the kiosk with `am force-stop com.wesbos.homehq`, then `am start -n com.wesbos.homehq/.MainActivity`. WebView reuses TLS connections and sessions, and one opened without a certificate stays without one. On 2026-10-24, connections from before mTLS was on for the host got 404 until this restart.
 
 Undo: `am start -n com.wesbos.homehq/.MainActivity --ez forget_client_cert true`. The frame then gets 404 until the worker stops checking for a certificate.
+
+## 8. ADB over Wi-Fi
+
+On 2026-10-25 adbd was set to listen on TCP port 5555 at every boot, so ADB needs no USB cable. Key auth stays on (`ro.adb.secure=1`), so only a Mac whose key is in `/data/misc/adb/adb_keys` gets in. Any device on the LAN can reach the port.
+
+```sh
+mise exec -- adb shell su 0 setprop persist.adb.tcp.port 5555   # was unset
+mise exec -- adb tcpip 5555
+mise exec -- adb connect 192.168.68.73:5555
+```
+
+It still listened after a reboot on 2026-10-25. The address comes from DHCP. If `adb connect` fails, read the new address in Android Settings → Wi-Fi, or reserve the address on the router.
+
+Undo: `mise exec -- adb shell su 0 setprop persist.adb.tcp.port ""`, then `mise exec -- adb usb`.
 
 ## Not done yet
 

@@ -1,19 +1,29 @@
-diff -ruN kp-a/dashboard/kiosk/build.sh kp-b/dashboard/kiosk/build.sh
+diff --git a/dashboard/kiosk/build.sh b/dashboard/kiosk/build.sh
+index 205bad9..b673f81 100755
 --- a/dashboard/kiosk/build.sh
 +++ b/dashboard/kiosk/build.sh
-@@ -29,7 +29,7 @@
+@@ -29,7 +29,7 @@ fi
  # Target 28: Android 15 refuses to install below 24, and Android 14+ warns below 28 on the first
  # launch. Targets of 30 and up need manifest changes (package visibility, exported), so stay at 28.
  "$BT/aapt2" link -o build/base.apk -I "$JAR" --manifest AndroidManifest.xml ${ASSETS[@]+"${ASSETS[@]}"} build/res.zip \
 -  --java build/gen --min-sdk-version 23 --target-sdk-version 28 --version-code 2 --version-name 1.1
-+  --java build/gen --min-sdk-version 23 --target-sdk-version 28 --version-code 4 --version-name 1.2-mtls
++  --java build/gen --min-sdk-version 23 --target-sdk-version 28 --version-code 6 --version-name 1.4-mtls
  
  javac -nowarn -source 8 -target 8 -classpath "$JAR" -d build/classes \
    src/com/wesbos/homehq/*.java build/gen/com/wesbos/homehq/R.java
-diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java
---- a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java	2026-10-24 23:14:20
-+++ b/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java	2026-10-24 23:14:06
-@@ -7,6 +7,7 @@
+diff --git a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java b/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java
+index 9af97d9..4c3ec03 100644
+--- a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java
++++ b/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java
+@@ -1,16 +1,21 @@
+ package com.wesbos.homehq;
+ 
+ import android.app.Activity;
++import android.app.AlarmManager;
+ import android.app.AlertDialog;
++import android.app.PendingIntent;
+ import android.content.BroadcastReceiver;
+ import android.content.ComponentName;
  import android.content.Context;
  import android.content.Intent;
  import android.content.IntentFilter;
@@ -21,15 +31,24 @@ diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dash
  import android.content.pm.PackageManager;
  import android.content.pm.ResolveInfo;
  import android.graphics.Bitmap;
-@@ -20,6 +21,7 @@
++import android.graphics.Canvas;
+ import android.graphics.Color;
++import android.media.AudioManager;
+ import android.net.ConnectivityManager;
+ import android.net.NetworkInfo;
+ import android.net.Uri;
+@@ -18,8 +23,10 @@ import android.net.http.SslError;
+ import android.os.Bundle;
+ import android.os.Handler;
  import android.os.Looper;
++import android.os.Process;
  import android.os.SystemClock;
  import android.provider.Settings;
 +import android.util.Base64;
  import android.util.Log;
  import android.util.TypedValue;
  import android.view.Gravity;
-@@ -27,6 +29,8 @@
+@@ -27,6 +34,8 @@ import android.view.InputDevice;
  import android.view.MotionEvent;
  import android.view.View;
  import android.view.WindowManager;
@@ -38,11 +57,12 @@ diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dash
  import android.webkit.SslErrorHandler;
  import android.webkit.WebResourceRequest;
  import android.webkit.WebResourceResponse;
-@@ -37,8 +41,16 @@
+@@ -37,16 +46,29 @@ import android.widget.Button;
  import android.widget.FrameLayout;
  import android.widget.LinearLayout;
  import android.widget.TextView;
 +import java.io.ByteArrayInputStream;
++import java.io.ByteArrayOutputStream;
  import java.io.IOException;
  import java.io.InputStream;
 +import java.security.GeneralSecurityException;
@@ -52,10 +72,22 @@ diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dash
 +import java.security.cert.CertificateFactory;
 +import java.security.cert.X509Certificate;
 +import java.security.spec.PKCS8EncodedKeySpec;
++import java.util.Calendar;
  import java.util.HashMap;
  import java.util.Locale;
  import java.util.Map;
-@@ -54,6 +66,9 @@
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
+ 
+ /**
+  * Full-screen kiosk WebView for the Home HQ wall tablet.
+  * - Immersive mode hides the status + navigation bars (true 1280x800).
+  * - Controls: hold two fingers still on the screen for 1.5s for launcher/settings/Wi-Fi/reload.
++ * - Restarts its own process at 04:00 local time, so WebView memory does not grow for weeks.
+  * - Offline: a failed page load shows a native screen instead of WebView's error page (which
+  *   prints the full URL, including any token in it). With no Wi-Fi it offers Wi-Fi settings.
+  * - Remote debugging is OFF unless launched with the debug extra (every app on this device
+@@ -54,6 +76,9 @@ import java.util.Map;
   *     adb shell am start -n com.wesbos.homehq/.MainActivity --ez debug true
   * - Launch with a URL: adb shell am start -a android.intent.action.VIEW -d <url> -n com.wesbos.homehq/.MainActivity
   * - Set the saved URL, used on every later launch: adb shell am start -n com.wesbos.homehq/.MainActivity --es url <url>
@@ -65,7 +97,7 @@ diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dash
   * - A site bundled at build time (KIOSK_SITE) is answered at http://127.0.0.1:8765/ from the
   *   APK's assets/site/, with no server; every other URL goes to the network as usual.
   * - Offer the kiosk as a Home app (--ez home false undoes it), then pick it:
-@@ -65,6 +80,9 @@
+@@ -65,6 +90,9 @@ public class MainActivity extends Activity {
    static final String DEFAULT_URL = "https://home-dashboard.wesbos.workers.dev/";
    static final String PREFS = "kiosk";
    static final String PREF_URL = "url";
@@ -75,26 +107,67 @@ diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dash
    static final long EXIT_HOLD_MS = 1500;
    static final int CANCEL_POINTER_IDS = 10; // touch ids 0-9
    static final long RETRY_MS = 5000;
-@@ -90,6 +108,7 @@
+@@ -75,6 +103,13 @@ public class MainActivity extends Activity {
+   static final String LOCAL_HOST = "127.0.0.1";
+   static final int LOCAL_PORT = 8765;
+   static final String LOCAL_ASSETS = "site";
++  static final String SU = "/system/xbin/su";
++  static final String BL_POWER = "/sys/class/backlight/backlight/bl_power";
++  static final int NIGHTLY_RESTART_HOUR = 4;
++  static final long NIGHTLY_CHECK_MS = 10 * 60 * 1000;
++  static final long MIN_RUN_BEFORE_RESTART_MS = 60 * 60 * 1000;
++  static final long RESTART_DELAY_MS = 1000;
++  static final int SCREENSHOT_JPEG_QUALITY = 70;
+ 
+   private WebView web;
+   private final Handler handler = new Handler(Looper.getMainLooper());
+@@ -90,7 +125,23 @@ public class MainActivity extends Activity {
    // A retry is queued: keep the offline screen up until it runs, even if the failed load "finishes".
    private boolean retryPending;
    private LinearLayout offline;
 +  private ClientCert clientCert;
    private TextView offlineTitle, offlineText;
++  private final ExecutorService rootShell = Executors.newSingleThreadExecutor();
++  private long createdAt;
++
++  private final Runnable nightlyRestart = new Runnable() {
++    @Override
++    public void run() {
++      boolean restartHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) == NIGHTLY_RESTART_HOUR;
++      if (restartHour && SystemClock.elapsedRealtime() - createdAt > MIN_RUN_BEFORE_RESTART_MS) {
++        Log.i(TAG, "Nightly restart");
++        restartKiosk();
++        return;
++      }
++      handler.postDelayed(this, NIGHTLY_CHECK_MS);
++    }
++  };
  
    private final Runnable retry = new Runnable() {
-@@ -163,6 +182,7 @@
+     @Override
+@@ -151,6 +202,9 @@ public class MainActivity extends Activity {
+   @Override
+   protected void onCreate(Bundle state) {
+     super.onCreate(state);
++    createdAt = SystemClock.elapsedRealtime();
++    setPanelPower(true);
++    handler.postDelayed(nightlyRestart, NIGHTLY_CHECK_MS);
+     applyDebugFlag(getIntent());
+     applyHomeFlag(getIntent());
+     keepNavigationEnabled();
+@@ -163,6 +217,7 @@ public class MainActivity extends Activity {
      s.setDomStorageEnabled(true);
      s.setUseWideViewPort(true);
      s.setMediaPlaybackRequiresUserGesture(false);
-+    web.addJavascriptInterface(new Backlight(), "HomeHQ");
++    web.addJavascriptInterface(new Kiosk(), "Kiosk");
      // Keep navigation inside the kiosk. When the kiosk starts at boot before Wi-Fi is up, the
      // first load fails and would stay on the error page, so retry failed main-frame loads.
      // The offline screen covers WebView's error page until a load succeeds.
-@@ -206,6 +226,16 @@
+@@ -205,6 +260,16 @@ public class MainActivity extends Activity {
+         handler.postDelayed(retry, RETRY_MS);
        }
  
-       @Override
++      @Override
 +      public void onReceivedClientCertRequest(WebView view, ClientCertRequest request) {
 +        ClientCert cert = clientCert;
 +        if (cert == null || !cert.host.equalsIgnoreCase(request.getHost())) {
@@ -104,11 +177,10 @@ diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dash
 +        request.proceed(cert.key, cert.chain);
 +      }
 +
-+      @Override
+       @Override
        public void onReceivedSslError(WebView view, SslErrorHandler h, SslError error) {
          // Never bypass a certificate error. Frames without a clock battery boot with an old date
-         // after a power cut, so every certificate looks invalid until network time arrives. Treat
-@@ -238,6 +268,8 @@
+@@ -238,6 +303,8 @@ public class MainActivity extends Activity {
      setContentView(root);
  
      String url = urlFrom(getIntent());
@@ -117,7 +189,7 @@ diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dash
      load(url != null ? url : savedUrl());
      @SuppressWarnings("deprecation")
      IntentFilter connectivity = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
-@@ -265,6 +297,7 @@
+@@ -265,6 +332,7 @@ public class MainActivity extends Activity {
      applyDebugFlag(intent);
      applyHomeFlag(intent);
      String url = urlFrom(intent);
@@ -125,12 +197,10 @@ diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dash
      if (url != null) {
        handler.removeCallbacks(retry);
        handler.removeCallbacks(stall);
-@@ -287,6 +320,92 @@
-     getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_URL, saved).apply();
-     Log.i(TAG, "Saved kiosk URL: " + forLog(saved));
+@@ -289,6 +357,167 @@ public class MainActivity extends Activity {
      return saved;
-+  }
-+
+   }
+ 
 +  static final class ClientCert {
 +    final String host;
 +    final PrivateKey key;
@@ -184,17 +254,92 @@ diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dash
 +    }
 +  }
 +
-+  /** The page calls HomeHQ.setBacklight(false) to dim the panel to its lowest level, and true to restore it. */
-+  public final class Backlight {
++  /** The page's window.Kiosk. */
++  public final class Kiosk {
++    /** 0 powers the backlight off. Above 0, sets the window brightness, where 1 is the maximum. */
 +    @JavascriptInterface
-+    public void setBacklight(boolean on) {
++    public void setBrightness(float level) {
 +      runOnUiThread(() -> {
++        boolean on = level > 0;
++        setPanelPower(on);
 +        WindowManager.LayoutParams attrs = getWindow().getAttributes();
-+        attrs.screenBrightness = on ? WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE : 0f;
++        attrs.screenBrightness = on ? Math.min(level, 1f) : 0f;
 +        getWindow().setAttributes(attrs);
-+        Log.i(TAG, "Backlight " + (on ? "on" : "off"));
++        Log.i(TAG, "Brightness " + level);
 +      });
 +    }
++
++    /** Sets the media volume, which WebView audio plays at. 0 mutes it, and 1 is the maximum. */
++    @JavascriptInterface
++    public void setVolume(float level) {
++      AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
++      int max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
++      int index = Math.round(Math.max(0f, Math.min(level, 1f)) * max);
++      audio.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0);
++      Log.i(TAG, "Volume " + index + " of " + max);
++    }
++
++    /** Restarts the kiosk process, which also drops WebView's TLS connections and sessions. */
++    @JavascriptInterface
++    public void restart() {
++      runOnUiThread(MainActivity.this::restartKiosk);
++    }
++
++    /**
++     * Draws the window and sends it back to the page as a "kiosk-screenshot" event, whose detail
++     * is a base64 JPEG, or "" if the draw failed.
++     */
++    @JavascriptInterface
++    public void screenshot() {
++      runOnUiThread(() -> {
++        String jpeg = captureJpeg();
++        web.evaluateJavascript(
++            "dispatchEvent(new CustomEvent('kiosk-screenshot', {detail: '" + jpeg + "'}))", null);
++      });
++    }
++  }
++
++  private String captureJpeg() {
++    View root = getWindow().getDecorView();
++    try {
++      Bitmap bitmap = Bitmap.createBitmap(root.getWidth(), root.getHeight(), Bitmap.Config.RGB_565);
++      root.draw(new Canvas(bitmap));
++      ByteArrayOutputStream jpeg = new ByteArrayOutputStream();
++      bitmap.compress(Bitmap.CompressFormat.JPEG, SCREENSHOT_JPEG_QUALITY, jpeg);
++      bitmap.recycle();
++      Log.i(TAG, "Screenshot " + jpeg.size() + " bytes");
++      return Base64.encodeToString(jpeg.toByteArray(), Base64.NO_WRAP);
++    } catch (RuntimeException | OutOfMemoryError e) {
++      Log.w(TAG, "Screenshot failed: " + e);
++      return "";
++    }
++  }
++
++  /**
++   * Window brightness 0 still leaves the panel at the firmware's minimum, so off goes through the
++   * backlight driver's bl_power instead. Only root can write it, and the firmware's su lets any app
++   * become root.
++   */
++  private void setPanelPower(boolean on) {
++    String command = "echo " + (on ? 0 : 4) + " > " + BL_POWER;
++    rootShell.execute(() -> {
++      try {
++        int exit = Runtime.getRuntime().exec(new String[] {SU, "0", "sh", "-c", command}).waitFor();
++        if (exit != 0) Log.w(TAG, "Panel power " + (on ? "on" : "off") + " failed, su exit " + exit);
++      } catch (IOException | InterruptedException e) {
++        Log.w(TAG, "Panel power " + (on ? "on" : "off") + " failed: " + e);
++      }
++    });
++  }
++
++  private void restartKiosk() {
++    Log.i(TAG, "Restarting the kiosk");
++    Intent launch = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++    PendingIntent pending = PendingIntent.getActivity(this, 0, launch,
++        PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
++    ((AlarmManager) getSystemService(ALARM_SERVICE))
++        .setExact(AlarmManager.RTC, System.currentTimeMillis() + RESTART_DELAY_MS, pending);
++    Process.killProcess(Process.myPid());
 +  }
 +
 +  static ClientCert parseClientCert(String host, String keyB64, String certB64)
@@ -215,6 +360,16 @@ diff -ruN kp-a/dashboard/kiosk/src/com/wesbos/homehq/MainActivity.java kp-b/dash
 +    verifier.update(probe);
 +    if (!verifier.verify(signer.sign())) throw new IllegalArgumentException("key does not match certificate");
 +    return new ClientCert(host, key, cert);
-   }
- 
++  }
++
    /**
+    * The URL without user info, query or fragment, for logcat. Those parts can carry API keys or
+    * tokens, and any app with READ_LOGS (or anyone with ADB) can read the log.
+@@ -511,6 +740,7 @@ public class MainActivity extends Activity {
+   protected void onDestroy() {
+     unregisterReceiver(networkChange);
+     handler.removeCallbacksAndMessages(null);
++    rootShell.shutdown();
+     if (web != null) web.destroy();
+     super.onDestroy();
+   }

@@ -1,19 +1,30 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BUILD_ID } from "../../shared/build";
 import {
+  DEFAULT_SETTINGS,
   HEARTBEAT_MS,
   PING,
   PONG,
   type FrameCommand,
   type FrameMessage,
+  type FrameSettings,
   type ScreenId,
 } from "../../shared/control";
+import { playChime } from "../lib/chime";
 import { prefetchThenReload } from "../lib/reload";
 
 declare global {
   interface Window {
-    /** Added by the Home HQ kiosk 1.2-mtls and later. Absent in a desktop browser. */
-    HomeHQ?: { setBacklight(on: boolean): void };
+    /** Added by the Home HQ kiosk 1.3-mtls and later (`device/homehq.patch`). Absent in a desktop browser. */
+    Kiosk?: {
+      /** 0 powers the backlight off. */
+      setBrightness(level: number): void;
+      /** 0 mutes, and 1 is the maximum. */
+      setVolume(level: number): void;
+      restart(): void;
+      /** Answers with a `kiosk-screenshot` event whose detail is a base64 JPEG, or "" on failure. */
+      screenshot(): void;
+    };
   }
 }
 
@@ -22,7 +33,9 @@ const MAX_RETRY_MS = 30_000;
 const SILENT_LIMIT_MS = HEARTBEAT_MS + 10_000;
 
 export interface FrameControl {
-  screenOn: boolean;
+  settings: FrameSettings;
+  /** Applies settings on this frame only, for example while a slider moves. */
+  preview: (settings: Partial<FrameSettings>) => void;
   /** The worker runs a newer deploy than this page. */
   buildChanged: boolean;
   send: (command: FrameCommand) => void;
@@ -32,7 +45,7 @@ export interface FrameControl {
 export function useFrameControl(
   onShow: (screen: ScreenId) => void,
 ): FrameControl {
-  const [screenOn, setScreenOn] = useState(true);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [buildChanged, setBuildChanged] = useState(false);
   const socket = useRef<WebSocket | null>(null);
   const show = useRef(onShow);
@@ -65,13 +78,26 @@ export function useFrameControl(
         heardAt = Date.now();
         if (data === PONG) return;
         const message = JSON.parse(data) as FrameMessage;
-        if (message.type === "state") {
-          setScreenOn(message.settings.screenOn);
-          setBuildChanged(message.build !== BUILD_ID);
-        } else if (message.type === "show") {
-          show.current(message.screen);
-        } else {
-          prefetchThenReload();
+        switch (message.type) {
+          case "state":
+            setSettings(message.settings);
+            setBuildChanged(message.build !== BUILD_ID);
+            break;
+          case "show":
+            show.current(message.screen);
+            break;
+          case "reload":
+            prefetchThenReload();
+            break;
+          case "restart":
+            restartKiosk();
+            break;
+          case "chime":
+            playChime();
+            break;
+          case "screenshot":
+            uploadScreenshot();
+            break;
         }
       };
       heartbeat = setInterval(() => {
@@ -89,14 +115,44 @@ export function useFrameControl(
     };
   }, []);
 
-  useEffect(() => window.HomeHQ?.setBacklight(screenOn), [screenOn]);
+  const level = settings.screenOn ? settings.brightness : 0;
+  useEffect(() => window.Kiosk?.setBrightness(level), [level]);
+  useEffect(() => window.Kiosk?.setVolume(settings.volume), [settings.volume]);
+
+  const preview = (changes: Partial<FrameSettings>) =>
+    setSettings((current) => ({ ...current, ...changes }));
 
   const send = (command: FrameCommand) => {
-    if (command.type === "screen") setScreenOn(command.on);
+    if (command.type === "set") preview(command.settings);
     if (socket.current?.readyState === WebSocket.OPEN) {
       socket.current.send(JSON.stringify(command));
     }
   };
 
-  return { screenOn, buildChanged, send };
+  return { settings, preview, buildChanged, send };
+}
+
+export function restartKiosk() {
+  if (window.Kiosk) window.Kiosk.restart();
+  else location.reload();
+}
+
+function uploadScreenshot() {
+  const kiosk = window.Kiosk;
+  if (!kiosk) return;
+  addEventListener(
+    "kiosk-screenshot",
+    (event) => {
+      const jpeg = (event as CustomEvent<string>).detail;
+      if (!jpeg) return;
+      fetch(`data:image/jpeg;base64,${jpeg}`)
+        .then((response) => response.blob())
+        .then((image) =>
+          fetch("/api/control/screenshot", { method: "PUT", body: image }),
+        )
+        .catch(() => undefined);
+    },
+    { once: true },
+  );
+  kiosk.screenshot();
 }

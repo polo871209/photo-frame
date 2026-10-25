@@ -1,4 +1,4 @@
-import { parseCommand } from "../shared/control";
+import { COMMAND_SHAPES, parseCommand } from "../shared/control";
 import type { CalendarInfo, EventsResponse } from "../shared/events";
 import type { FrameControl } from "./control";
 import { expandIcs } from "./ics";
@@ -77,6 +77,9 @@ async function handleApi(
     return handleSpotify(request, url.pathname, spotifyCredentials(env));
   }
   if (url.pathname === "/api/control") return handleControl(request, env);
+  if (url.pathname === "/api/control/screenshot") {
+    return handleScreenshot(request, env);
+  }
   if (url.pathname === "/api/weather") return noStore(await weatherReport());
   if (url.pathname !== "/api/events") return notFound();
 
@@ -118,11 +121,34 @@ async function handleControl(request: Request, env: Env): Promise<Response> {
   const command = parseCommand(await request.json().catch(() => undefined));
   if (!command) {
     return Response.json(
-      { error: 'expected {"type":"screen","on":boolean}, {"type":"show","screen":"calendar"|"music"} or {"type":"reload"}' },
+      { error: `expected one of ${COMMAND_SHAPES.join(", ")}` },
       { status: 400 },
     );
   }
   return noStore(await control.command(command));
+}
+
+async function handleScreenshot(request: Request, env: Env): Promise<Response> {
+  const control = env.FRAME_CONTROL.getByName("frame");
+  if (request.method === "PUT") {
+    const image = await request.arrayBuffer();
+    if (image.byteLength > 2_000_000) {
+      return new Response(null, { status: 413 });
+    }
+    await control.receiveScreenshot(image);
+    return new Response(null, { status: 204 });
+  }
+  if (request.method !== "GET") return new Response(null, { status: 405 });
+  const image = await control.screenshot();
+  if (!image) {
+    return new Response("No frame sent a screenshot in time\n", {
+      status: 504,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+  return new Response(image, {
+    headers: { "Content-Type": "image/jpeg", "Cache-Control": "no-store" },
+  });
 }
 
 function noStore(body: unknown): Response {

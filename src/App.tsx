@@ -35,18 +35,19 @@ export function App() {
     localStorage.setItem(SCREEN_KEY, id);
   };
   const control = useFrameControl(pick);
+  const { screenOn } = control.settings;
   useEffect(() => {
     if (!control.buildChanged) return;
     const timer = setInterval(() => {
-      if (isIdle() || !control.screenOn) prefetchThenReload();
+      if (isIdle() || !screenOn) prefetchThenReload();
     }, 10_000);
     return () => clearInterval(timer);
-  }, [control.buildChanged, control.screenOn]);
+  }, [control.buildChanged, screenOn]);
 
   return (
     <div class="stage" style={`transform:scale(${scale})`}>
       <main class="screen" hidden={screen !== "calendar"}>
-        <Calendar />
+        <Calendar chimes={control.settings.chimes && screenOn} />
       </main>
       {screen === "music" && (
         <main class="screen">
@@ -59,11 +60,13 @@ export function App() {
         </main>
       )}
       <ScreenMenu screen={screen} onPick={pick} />
-      {!control.screenOn && (
+      {!screenOn && (
         <button
           class="sleep"
           aria-label="Wake"
-          onClick={() => control.send({ type: "screen", on: true })}
+          onClick={() =>
+            control.send({ type: "set", settings: { screenOn: true } })
+          }
         />
       )}
     </div>

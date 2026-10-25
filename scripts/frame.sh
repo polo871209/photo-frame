@@ -2,18 +2,51 @@
 set -eu
 
 usage() {
-  echo "usage: pnpm frame [status | screen on|off | show calendar|music|weather | reload]" >&2
+  echo "usage: pnpm frame [status | screen on|off | brightness 1-100 | volume 0-100 | chimes on|off | chime" >&2
+  echo "                  | show calendar|music|weather | reload | restart | screenshot]" >&2
   exit 2
 }
 
+switch() {
+  case "${2:-}" in
+    on) body="{\"type\":\"set\",\"settings\":{\"$1\":true}}" ;;
+    off) body="{\"type\":\"set\",\"settings\":{\"$1\":false}}" ;;
+    *) usage ;;
+  esac
+}
+
+percent() {
+  setting=$1 min=$2 value=${3:-}
+  case "$value" in
+    '' | *[!0-9]*) usage ;;
+  esac
+  [ "$value" -ge "$min" ] && [ "$value" -le 100 ] || usage
+  if [ "$value" -eq 100 ]; then level=1; else level=$(printf '0.%02d' "$value"); fi
+  body="{\"type\":\"set\",\"settings\":{\"$setting\":$level}}"
+}
+
+mtls="$HOME/.config/photo-frame/mtls"
+url="${FRAME_URL:-https://photoframe.lochingpo.com}/api/control"
+
 case "${1:-status}" in
   status) body= ;;
-  screen)
-    case "${2:-}" in
-      on) body='{"type":"screen","on":true}' ;;
-      off) body='{"type":"screen","on":false}' ;;
-      *) usage ;;
-    esac ;;
+  screen) switch screenOn "${2:-}" ;;
+  chimes) switch chimes "${2:-}" ;;
+  brightness) percent brightness 1 "${2:-}" ;;
+  volume) percent volume 0 "${2:-}" ;;
+  chime) body='{"type":"chime"}' ;;
+  restart) body='{"type":"restart"}' ;;
+  screenshot)
+    out="$(dirname "$0")/../screenshots/frame-$(date +%Y%m%d-%H%M%S).jpg"
+    mkdir -p "$(dirname "$out")"
+    if ! curl -sS --fail-with-body --cert "$mtls/frame.crt" --key "$mtls/frame.key" \
+      -o "$out" "$url/screenshot"; then
+      cat "$out" >&2
+      rm -f "$out"
+      exit 1
+    fi
+    echo "$out"
+    exit ;;
   show)
     case "${2:-}" in
       calendar | music | weather) body="{\"type\":\"show\",\"screen\":\"$2\"}" ;;
@@ -23,8 +56,6 @@ case "${1:-status}" in
   *) usage ;;
 esac
 
-mtls="$HOME/.config/photo-frame/mtls"
-url="${FRAME_URL:-https://photoframe.lochingpo.com}/api/control"
 if [ -z "$body" ]; then
   curl -sS --fail-with-body --cert "$mtls/frame.crt" --key "$mtls/frame.key" "$url"
 else

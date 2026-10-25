@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { BUILD_ID } from "../shared/build";
 import {
+  DEFAULT_SETTINGS,
   parseCommand,
   PING,
   PONG,
@@ -11,10 +12,11 @@ import {
 } from "../shared/control";
 
 const SETTINGS_KEY = "settings";
-const DEFAULT_SETTINGS: FrameSettings = { screenOn: true };
 
 /** One instance holds the frame's settings and its WebSockets, and pushes every command at once. */
 export class FrameControl extends DurableObject {
+  private screenshotWaiters = new Set<(image: ArrayBuffer) => void>();
+
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
@@ -38,14 +40,37 @@ export class FrameControl extends DurableObject {
   }
 
   async command(command: FrameCommand): Promise<ControlStatus> {
-    if (command.type === "screen") {
-      const settings = { ...(await this.settings()), screenOn: command.on };
+    if (command.type === "set") {
+      const settings = { ...(await this.settings()), ...command.settings };
       await this.ctx.storage.put(SETTINGS_KEY, settings);
       this.broadcast(await this.stateMessage());
     } else {
       this.broadcast(command);
     }
     return this.status();
+  }
+
+  /** Asks the frame for a screenshot and waits for it. Null if no frame answers in time. */
+  async screenshot(): Promise<ArrayBuffer | null> {
+    let deliver!: (image: ArrayBuffer) => void;
+    const image = new Promise<ArrayBuffer>((resolve) => (deliver = resolve));
+    this.screenshotWaiters.add(deliver);
+    const stopWaiting = new AbortController();
+    const timeout = scheduler
+      .wait(20_000, { signal: stopWaiting.signal })
+      .then(() => null);
+    this.broadcast({ type: "screenshot" });
+    try {
+      return await Promise.race([image, timeout]);
+    } finally {
+      stopWaiting.abort();
+      this.screenshotWaiters.delete(deliver);
+    }
+  }
+
+  receiveScreenshot(image: ArrayBuffer) {
+    for (const deliver of this.screenshotWaiters) deliver(image);
+    this.screenshotWaiters.clear();
   }
 
   async webSocketMessage(_socket: WebSocket, message: string | ArrayBuffer) {
@@ -65,10 +90,9 @@ export class FrameControl extends DurableObject {
   }
 
   private async settings(): Promise<FrameSettings> {
-    return (
-      (await this.ctx.storage.get<FrameSettings>(SETTINGS_KEY)) ??
-      DEFAULT_SETTINGS
-    );
+    const stored =
+      await this.ctx.storage.get<Partial<FrameSettings>>(SETTINGS_KEY);
+    return { ...DEFAULT_SETTINGS, ...stored };
   }
 
   private async stateMessage(): Promise<FrameMessage> {

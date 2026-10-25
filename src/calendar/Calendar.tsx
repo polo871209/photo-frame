@@ -10,6 +10,7 @@ import { useCalendarPrefs, withPrefs } from "./prefs";
 import { Schedule } from "./Schedule";
 import { SettingsSheet } from "./SettingsSheet";
 import { TimeGrid } from "./TimeGrid";
+import { useChimes } from "./useChimes";
 import { useEvents } from "./useEvents";
 import { step, title, VIEWS, visibleRange, type ViewId } from "./views";
 
@@ -17,7 +18,7 @@ const SWIPE_MIN_PX = 80;
 const SWIPE_MAX_DRIFT_PX = 60;
 const SWIPE_MAX_MS = 600;
 
-export function Calendar() {
+export function Calendar({ chimes }: { chimes: boolean }) {
   const now = useNow();
   const [prefs, setPrefs] = useCalendarPrefs();
   const [view, setView] = useState<ViewId>(prefs.homeView);
@@ -30,6 +31,7 @@ export function Calendar() {
     () => withPrefs(events.occurrences, prefs),
     [events.occurrences, prefs],
   );
+  useChimes(occurrences, now, chimes);
 
   const swipeStart = useRef<{ x: number; y: number; at: number } | null>(null);
   const ignoreTapsUntil = useRef(0);
