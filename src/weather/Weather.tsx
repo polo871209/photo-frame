@@ -1,16 +1,11 @@
 import { useEffect, useState } from "preact/hooks";
 import type { AirPlace, AirReading, Forecast } from "../../shared/weather";
-import { Icon } from "../icons";
 import { format, parseLocalDate, sameDay, startOfDay } from "../lib/dates";
 import { isIdle } from "../lib/idle";
 import { useNow } from "../lib/useNow";
-import {
-  describeApi,
-  describePm25,
-  describeWeather,
-  type AirLevel,
-} from "./labels";
+import { describeAir, describeWeather } from "./labels";
 import { useWeather } from "./useWeather";
+import { RainDrop, WeatherIcon } from "./WeatherIcon";
 
 const SLOT_HOURS = [6, 9, 12, 15, 18, 21];
 const HOUR_MS = 3600e3;
@@ -68,11 +63,12 @@ export function Weather() {
                 ? "Today"
                 : format.weekdayShort(entry.start)}
             </span>
-            <Icon name={describeWeather(entry.code, true).icon} size={40} />
+            <WeatherIcon sky={describeWeather(entry.code).sky} isDay size={56} />
             <span class="wx-day-temps">
               <span class="num wx-max">{degrees(entry.maxC)}</span>
               <span class="num wx-min">{degrees(entry.minC)}</span>
             </span>
+            <Rain chance={entry.rainChance} />
           </button>
         ))}
       </nav>
@@ -88,24 +84,21 @@ function Summary({
   day: Day;
   current: Forecast["current"] | undefined;
 }) {
-  const condition = current
-    ? describeWeather(current.code, current.isDay)
-    : describeWeather(day.code, true);
+  const condition = describeWeather(current?.code ?? day.code);
   return (
     <section class="wx-now">
-      <Icon name={condition.icon} size={132} />
+      <WeatherIcon
+        sky={condition.sky}
+        isDay={current?.isDay ?? true}
+        size={168}
+      />
       <span class="num wx-temp">{degrees(current?.tempC ?? day.maxC)}</span>
       <div>
         <p class="title wx-cond">{condition.label}</p>
         <p class="wx-sub">
           High {degrees(day.maxC)} · Low {degrees(day.minC)}
         </p>
-        {day.rainChance !== null && (
-          <p class="wx-sub">
-            <Icon name="umbrella" size={22} />
-            Rain {day.rainChance}%
-          </p>
-        )}
+        <Rain chance={day.rainChance} />
       </div>
     </section>
   );
@@ -114,58 +107,55 @@ function Summary({
 function Air({ places }: { places: AirPlace[] }) {
   const [main, ...nearby] = places;
   const reading = main?.reading;
-  if (!main || !reading) {
-    return (
-      <section class="wx-air">
-        <span class="label">Air quality{main && ` · ${main.place}`}</span>
-        <p class="wx-none">No reading</p>
-        <NearbyAir places={nearby} />
-      </section>
-    );
-  }
-  const level = describeReading(reading);
+  const air = reading && describeAir(reading);
   return (
-    <section class="wx-air" data-tone={level.tone}>
+    <section class="wx-air">
       <span class="label">
-        {scaleName(reading)} · {main.place}
+        {reading ? scaleName(reading) : "Air quality"}
+        {main && ` · ${main.place}`}
       </span>
-      <div class="wx-air-main">
-        <span class="num wx-air-value">{Math.round(reading.value)}</span>
-        <div>
-          <p class="title wx-air-level">{level.label}</p>
-          <p class="wx-air-advice">{level.advice}</p>
-        </div>
-      </div>
-      <NearbyAir places={nearby} />
-      <span class="label">
-        {main.source} · {format.time(new Date(reading.at))}
-      </span>
+      {air ? (
+        <>
+          <div class="wx-air-main">
+            <span class="num wx-air-value">{Math.round(reading.value)}</span>
+            <div>
+              <p class="title wx-air-level">{air.band.label}</p>
+              <p class="wx-air-advice">{air.band.advice}</p>
+            </div>
+          </div>
+          <div class="wx-scale">
+            {air.bands.map(({ upTo, tone }) => (
+              <span key={upTo} data-tone={tone} />
+            ))}
+            <i style={{ left: `${air.fraction * 100}%` }} />
+          </div>
+        </>
+      ) : (
+        <p class="wx-none">No reading</p>
+      )}
+      <ul class="wx-air-nearby">
+        {nearby.map(({ place, source, reading }) => (
+          <li key={place}>
+            <span class="wx-air-place">{place}</span>
+            <span class="label">
+              {reading ? scaleName(reading) : "No reading"} · {source}
+            </span>
+            {reading && (
+              <>
+                <span class="wx-dot" data-tone={describeAir(reading).band.tone} />
+                <span class="num">{Math.round(reading.value)}</span>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      {reading && (
+        <span class="label">
+          {main.source} · {format.time(new Date(reading.at))}
+        </span>
+      )}
     </section>
   );
-}
-
-function NearbyAir({ places }: { places: AirPlace[] }) {
-  return (
-    <ul class="wx-air-nearby">
-      {places.map(({ place, source, reading }) => (
-        <li key={place}>
-          <span class="wx-air-place">{place}</span>
-          <span class="label">
-            {reading ? scaleName(reading) : "No reading"} · {source}
-          </span>
-          {reading && (
-            <span class="num">{Math.round(reading.value)}</span>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function describeReading(reading: AirReading): AirLevel {
-  return reading.scale === "api"
-    ? describeApi(reading.value)
-    : describePm25(reading.value);
 }
 
 function scaleName(reading: AirReading) {
@@ -201,17 +191,26 @@ function Slots({
           class={+slot.start + HOUR_MS <= +now ? "is-past" : undefined}
         >
           <span class="label">{format.hour(slot.start)}</span>
-          <Icon name={describeWeather(slot.code, slot.isDay).icon} size={36} />
+          <WeatherIcon
+            sky={describeWeather(slot.code).sky}
+            isDay={slot.isDay}
+            size={56}
+          />
           <span class="num wx-slot-temp">{degrees(slot.tempC)}</span>
-          {slot.rainChance !== null && (
-            <span class="wx-rain">
-              <Icon name="umbrella" size={16} />
-              {slot.rainChance}%
-            </span>
-          )}
+          <Rain chance={slot.rainChance} />
         </li>
       ))}
     </ol>
+  );
+}
+
+function Rain({ chance }: { chance: number | null }) {
+  if (chance === null) return null;
+  return (
+    <span class="wx-rain">
+      <RainDrop size={18} />
+      {chance}%
+    </span>
   );
 }
 
