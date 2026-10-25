@@ -13,7 +13,6 @@ import {
 
 const SETTINGS_KEY = "settings";
 
-/** One instance holds the frame's settings and its WebSockets, and pushes every command at once. */
 export class FrameControl extends DurableObject {
   private screenshotWaiters = new Set<(image: ArrayBuffer) => void>();
 
@@ -50,7 +49,6 @@ export class FrameControl extends DurableObject {
     return this.status();
   }
 
-  /** Asks the frame for a screenshot and waits for it. Null if no frame answers in time. */
   async screenshot(): Promise<ArrayBuffer | null> {
     let deliver!: (image: ArrayBuffer) => void;
     const image = new Promise<ArrayBuffer>((resolve) => (deliver = resolve));

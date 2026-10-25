@@ -19,7 +19,6 @@ export interface LyricsQuery {
   durationMs: number;
 }
 
-/** Looks the track up in LRCLIB: first by exact metadata, then by title and artist with a duration within a few seconds. */
 export async function findLyrics(query: LyricsQuery): Promise<Lyrics> {
   const seconds = Math.round(query.durationMs / 1000);
   const exact = await lrclib<LrclibRecord>(

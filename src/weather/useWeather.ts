@@ -8,7 +8,6 @@ export interface WeatherState {
   error?: string;
 }
 
-/** Polls `/api/weather`. If a source fails, it keeps that source's last answer. */
 export function useWeather(): WeatherState {
   const [state, setState] = useState<WeatherState>({});
 

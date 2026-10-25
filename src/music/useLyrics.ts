@@ -5,7 +5,6 @@ const RETRY_MS = 15_000;
 
 export type LyricsState = Lyrics | { kind: "loading" } | { kind: "error" };
 
-/** Fetches the lyrics of `uri` while `enabled`, and retries a failed fetch every 15 s. */
 export function useLyrics(
   uri: string | undefined,
   enabled: boolean,

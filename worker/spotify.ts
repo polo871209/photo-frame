@@ -72,7 +72,6 @@ const COMMANDS = {
 
 let cachedToken: { value: string; expiresAt: number } | undefined;
 
-/** Serves `/api/spotify` and the paths under it. Without credentials, it serves sample data and refuses commands. */
 export async function handleSpotify(
   request: Request,
   path: string,
@@ -375,7 +374,6 @@ async function control(
   }
 }
 
-/** Starts playback and returns the device it sent the command to, or `undefined` for the active device. */
 async function play(
   token: string,
   body: object | undefined,

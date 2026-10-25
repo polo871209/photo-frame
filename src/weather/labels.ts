@@ -24,7 +24,7 @@ export function describeWeather(
   return { label: "Cloudy", icon: "cloud" };
 }
 
-export type AirTone =
+type AirTone =
   | "good"
   | "moderate"
   | "unhealthy"
@@ -37,7 +37,6 @@ export interface AirLevel {
   advice: string;
 }
 
-/** The DOE bands of Malaysia's Air Pollutant Index, with the DOE's advice in short. */
 export function describeApi(api: number): AirLevel {
   if (api <= 50) return { tone: "good", label: "Good", advice: "Clean air" };
   if (api <= 100) {

@@ -17,9 +17,7 @@ declare global {
   interface Window {
     /** Added by the Home HQ kiosk 1.3-mtls and later (`device/homehq.patch`). Absent in a desktop browser. */
     Kiosk?: {
-      /** 0 powers the backlight off. */
       setBrightness(level: number): void;
-      /** 0 mutes, and 1 is the maximum. */
       setVolume(level: number): void;
       restart(): void;
       /** Answers with a `kiosk-screenshot` event whose detail is a base64 JPEG, or "" on failure. */
@@ -34,14 +32,11 @@ const SILENT_LIMIT_MS = HEARTBEAT_MS + 10_000;
 
 export interface FrameControl {
   settings: FrameSettings;
-  /** Applies settings on this frame only, for example while a slider moves. */
   preview: (settings: Partial<FrameSettings>) => void;
-  /** The worker runs a newer deploy than this page. */
   buildChanged: boolean;
   send: (command: FrameCommand) => void;
 }
 
-/** Keeps a WebSocket open to `/api/control` and applies what the worker pushes. */
 export function useFrameControl(
   onShow: (screen: ScreenId) => void,
 ): FrameControl {

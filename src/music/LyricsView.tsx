@@ -15,14 +15,12 @@ const NOTES: Record<
   none: "No lyrics for this song",
 };
 
-/** Where the track stands: at `progressMs` at the `Date.now()` instant `at`, and moving if `playing`. */
 export interface Playhead {
   progressMs: number;
   at: number;
   playing: boolean;
 }
 
-/** `playhead` is `null` when the track is not live, so no line is lit. */
 export function LyricsView({
   lyrics,
   playhead,
@@ -79,7 +77,6 @@ export function LyricsView({
   );
 }
 
-/** Returns the lit line, and renders again when the next line starts. */
 function useActiveLine(lyrics: LyricsState, playhead: Playhead | null): number {
   const [, wake] = useState(0);
   const lines = lyrics.kind === "synced" ? lyrics.lines : null;
@@ -105,7 +102,6 @@ function useActiveLine(lyrics: LyricsState, playhead: Playhead | null): number {
   return active;
 }
 
-/** Jumps `view` to `top` at once, then slides `content` there with a transform, which the compositor animates off the main thread. */
 function glideTo(view: HTMLElement, content: HTMLElement, top: number): void {
   const offset = new DOMMatrix(getComputedStyle(content).transform).m42;
   for (const animation of content.getAnimations()) animation.cancel();

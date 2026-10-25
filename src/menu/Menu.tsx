@@ -13,7 +13,6 @@ export interface ScreenEntry {
   icon: IconName;
 }
 
-/** The screen buttons and the clock at the top right. The clock opens the device settings. */
 export function Menu({
   screens,
   screen,

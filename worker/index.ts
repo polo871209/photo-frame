@@ -11,9 +11,7 @@ export { FrameControl } from "./control";
 interface Env {
   ASSETS: Fetcher;
   FRAME_CONTROL: DurableObjectNamespace<FrameControl>;
-  /** `CALENDARS` and every `CALENDARS_*` hold a JSON array of `{ "name", "url", "color" }`. `url` is a Google Calendar secret iCal address. */
   [calendars: `CALENDARS${string}`]: string | undefined;
-  /** The Spotify app that `pnpm spotify-login` signed in with, and the refresh token it got. If any is unset, `/api/spotify` returns a sample track. */
   SPOTIFY_CLIENT_ID?: string;
   SPOTIFY_CLIENT_SECRET?: string;
   SPOTIFY_REFRESH_TOKEN?: string;

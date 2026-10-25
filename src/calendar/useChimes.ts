@@ -4,7 +4,6 @@ import type { Occurrence } from "./model";
 
 const LEAD_MS = 5 * 60_000;
 
-/** Chimes once when a timed event is at most 5 min away. */
 export function useChimes(
   occurrences: Occurrence[],
   now: Date,

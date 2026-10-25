@@ -1,4 +1,3 @@
-/** Loads the new build's files into the HTTP cache, then reloads, so the reload paints at once. */
 export async function prefetchThenReload() {
   try {
     const page = await fetch("/");

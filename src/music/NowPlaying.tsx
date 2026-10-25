@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import type { PlayerCommand, Track } from "../../shared/spotify";
+import type { PlayerCommand } from "../../shared/spotify";
 import { Icon } from "../icons";
 import { format, sameDay } from "../lib/dates";
 import { sendCommand } from "./player";
@@ -52,7 +52,8 @@ export function NowPlaying() {
     <Controls
       playing={playing}
       canSkip={!!track && !data?.playedAt}
-      lyricsOn={track ? lyricsOn : undefined}
+      hasTrack={!!track}
+      lyricsOn={lyricsOn}
       onCommand={run}
       picking={picking}
       onTogglePicking={togglePicking}
@@ -136,10 +137,10 @@ export function NowPlaying() {
   );
 }
 
-/** `lyricsOn` is `undefined` when there is no track, which hides the lyrics toggle. */
 function Controls({
   playing,
   canSkip,
+  hasTrack,
   lyricsOn,
   picking,
   onCommand,
@@ -148,7 +149,8 @@ function Controls({
 }: {
   playing: boolean;
   canSkip: boolean;
-  lyricsOn: boolean | undefined;
+  hasTrack: boolean;
+  lyricsOn: boolean;
   picking: boolean;
   onCommand: (command: PlayerCommand) => void;
   onTogglePicking: () => void;
@@ -176,7 +178,7 @@ function Controls({
           <Icon name="next" size={CONTROL_ICON_PX} />
         </button>
       )}
-      {lyricsOn !== undefined && (
+      {hasTrack && (
         <button
           class={`music-ctl-lyrics${lyricsOn ? " is-on" : ""}`}
           aria-label="Lyrics"

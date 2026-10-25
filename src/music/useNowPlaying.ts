@@ -15,18 +15,15 @@ const CLOCK_TOLERANCE_MS = 1_000;
 
 interface LastPlaying {
   track: Track;
-  /** ISO instant of the last poll that saw `track` playing. */
   at: string;
 }
 
 export interface NowPlayingState {
   data?: NowPlaying;
-  /** The `Date.now()` instant at which the track stood at `data.progressMs`, to advance it locally. */
   receivedAt: number;
   error?: string;
 }
 
-/** Polls `/api/spotify`. After a player command, `refresh` polls fast until the player shows its result. */
 export function useNowPlaying(): NowPlayingState & {
   refresh: (command: PlayerCommand) => void;
 } {
@@ -80,7 +77,6 @@ export function useNowPlaying(): NowPlayingState & {
       }
       schedule(delay);
     };
-    /** Shows `data` and returns the delay before the next poll. */
     const show = (
       data: NowPlaying,
       sentAt: number,
@@ -96,7 +92,6 @@ export function useNowPlaying(): NowPlayingState & {
       }
       rememberPlaying(data);
       const next = withLastPlaying(data);
-      // Spotify read the position somewhere inside the round trip, so the midpoint is off by at most half of it.
       const reading = {
         at: (sentAt + receivedAt) / 2,
         roundTripMs: receivedAt - sentAt,

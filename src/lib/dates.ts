@@ -64,7 +64,6 @@ const clockFormat = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
-/** The time of day with the AM/PM marker apart, for locales that use one. */
 export function clockParts(date: Date): { time: string; period: string } {
   const parts = clockFormat.formatToParts(date);
   return {
