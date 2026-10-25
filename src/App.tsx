@@ -9,6 +9,7 @@ import { prefetchThenReload } from "./lib/reload";
 import { useTheme } from "./lib/theme";
 import { useNow } from "./lib/useNow";
 import { NowPlaying } from "./music/NowPlaying";
+import { Weather } from "./weather/Weather";
 
 const STAGE_WIDTH = 1280;
 const STAGE_HEIGHT = 800;
@@ -17,6 +18,7 @@ const SCREEN_KEY = "frame.screen";
 const SCREENS = [
   { id: "calendar", label: "Calendar", icon: "calendar" },
   { id: "music", label: "Music", icon: "music" },
+  { id: "weather", label: "Weather", icon: "cloudSun" },
 ] as const satisfies readonly { id: ScreenId; label: string; icon: IconName }[];
 
 export function App() {
@@ -49,6 +51,11 @@ export function App() {
       {screen === "music" && (
         <main class="screen">
           <NowPlaying />
+        </main>
+      )}
+      {screen === "weather" && (
+        <main class="screen">
+          <Weather />
         </main>
       )}
       <ScreenMenu screen={screen} onPick={pick} />

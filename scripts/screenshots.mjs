@@ -16,7 +16,7 @@ for (const theme of themes) await shoot(theme);
 await browser.close();
 
 console.log(
-  `Wrote ${themes.length * (views.length + 4)} screenshots to ${outDir}`,
+  `Wrote ${themes.length * (views.length + 6)} screenshots to ${outDir}`,
 );
 if (errors.length) {
   console.error(errors.join("\n"));
@@ -63,6 +63,14 @@ async function shoot(theme) {
   await page.waitForSelector(".music-info");
   await page.waitForTimeout(300);
   await page.screenshot({ path: path("Music") });
+  await page.click(".menu-btn");
+  await page.click('.menu-item:text-is("Weather")');
+  await page.waitForSelector(".wx-days");
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path("Weather") });
+  await page.click(".wx-day:nth-child(2)");
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path("WeatherDay") });
   await page.click(".menu-btn");
   await page.click('.menu-item:text-is("Calendar")');
   await page.close();

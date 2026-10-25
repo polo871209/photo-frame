@@ -4,6 +4,7 @@ import type { FrameControl } from "./control";
 import { expandIcs } from "./ics";
 import { sampleEvents, SAMPLE_CALENDARS } from "./sample";
 import { handleSpotify, type SpotifyCredentials } from "./spotify";
+import { weatherReport } from "./weather";
 
 export { FrameControl } from "./control";
 
@@ -76,6 +77,7 @@ async function handleApi(
     return handleSpotify(request, url.pathname, spotifyCredentials(env));
   }
   if (url.pathname === "/api/control") return handleControl(request, env);
+  if (url.pathname === "/api/weather") return noStore(await weatherReport());
   if (url.pathname !== "/api/events") return notFound();
 
   const from = new Date(url.searchParams.get("from") ?? "");

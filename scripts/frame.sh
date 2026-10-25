@@ -2,7 +2,7 @@
 set -eu
 
 usage() {
-  echo "usage: pnpm frame [status | screen on|off | show calendar|music | reload]" >&2
+  echo "usage: pnpm frame [status | screen on|off | show calendar|music|weather | reload]" >&2
   exit 2
 }
 
@@ -16,7 +16,7 @@ case "${1:-status}" in
     esac ;;
   show)
     case "${2:-}" in
-      calendar | music) body="{\"type\":\"show\",\"screen\":\"$2\"}" ;;
+      calendar | music | weather) body="{\"type\":\"show\",\"screen\":\"$2\"}" ;;
       *) usage ;;
     esac ;;
   reload) body='{"type":"reload"}' ;;

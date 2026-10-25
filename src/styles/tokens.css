@@ -9,6 +9,14 @@
   --line: #CCD0DA;
   --alert: #D20F39;
 
+  --aq-good: #8AADF4;
+  --aq-moderate: #A6DA95;
+  --aq-unhealthy: #EED49F;
+  --aq-very-unhealthy: #F5A97F;
+  --aq-hazardous: #ED8796;
+  --aq-ink: #24273A;
+  --aq-ink-rgb: 36 39 58;
+
   --c: var(--ink);
   --c-rgb: var(--ink-rgb);
 

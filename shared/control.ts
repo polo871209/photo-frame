@@ -1,4 +1,4 @@
-export const SCREEN_IDS = ["calendar", "music"] as const;
+export const SCREEN_IDS = ["calendar", "music", "weather"] as const;
 export type ScreenId = (typeof SCREEN_IDS)[number];
 
 /** Settings the worker keeps and sends to every frame when they change or a frame connects. */
