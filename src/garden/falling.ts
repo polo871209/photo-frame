@@ -66,7 +66,8 @@ export class FallingLeaves {
   private readonly restFrom: Float32Array;
   private readonly restUntil: Float32Array;
   private next = 0;
-  private dirty = false;
+  private dirtyFrom = Infinity;
+  private dirtyTo = -1;
 
   constructor(
     private readonly capacity: number,
@@ -129,7 +130,7 @@ export class FallingLeaves {
     const sweepable = launch.kind === "knocked";
     this.restFrom[slot] = sweepable ? now + landing.time : DEAD;
     this.restUntil[slot] = sweepable ? now + landing.time + rest - 2.5 : DEAD;
-    this.dirty = true;
+    this.touch(slot, slot);
   }
 
   sweep(
@@ -174,7 +175,7 @@ export class FallingLeaves {
       this.timing.setX(i, DEAD);
       this.restFrom[i] = DEAD;
       this.restUntil[i] = DEAD;
-      this.dirty = true;
+      this.touch(i, i);
       relaunch(from, velocity, size, rnd);
       moved++;
     }
@@ -185,16 +186,31 @@ export class FallingLeaves {
     for (let i = 0; i < this.capacity; i++) this.timing.setX(i, DEAD);
     this.restFrom.fill(DEAD);
     this.restUntil.fill(DEAD);
-    this.dirty = true;
+    this.touch(0, this.capacity - 1);
   }
 
   flush(): void {
-    if (!this.dirty) return;
-    this.start.needsUpdate = true;
-    this.velocity.needsUpdate = true;
-    this.terminal.needsUpdate = true;
-    this.timing.needsUpdate = true;
-    this.look.needsUpdate = true;
-    this.dirty = false;
+    if (this.dirtyTo < 0) return;
+    const slots = this.dirtyTo - this.dirtyFrom + 1;
+    for (const attribute of [
+      this.start,
+      this.velocity,
+      this.terminal,
+      this.timing,
+      this.look,
+    ]) {
+      attribute.addUpdateRange(
+        this.dirtyFrom * attribute.itemSize,
+        slots * attribute.itemSize,
+      );
+      attribute.needsUpdate = true;
+    }
+    this.dirtyFrom = Infinity;
+    this.dirtyTo = -1;
+  }
+
+  private touch(from: number, to: number): void {
+    this.dirtyFrom = Math.min(this.dirtyFrom, from);
+    this.dirtyTo = Math.max(this.dirtyTo, to);
   }
 }

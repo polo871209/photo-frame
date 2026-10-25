@@ -56,7 +56,9 @@ const WIND_SPEED = 1;
 const WIND_DIR = new Vector2(-0.94, -0.34).normalize();
 const SUN_TURN = 62;
 const SUN_HEIGHT = 19;
-const SHADOW_SIZE = 1024;
+const SHADOW_SIZE = 512;
+const SHADOW_EVERY = 2;
+const RENDER_SCALE = 0.6;
 const LEAF_SCALE = 0.16;
 const REGROW_AFTER = 18;
 const REST_TIME = 60;
@@ -65,7 +67,7 @@ const GROW_TIME = 1.7;
 const BLOW_TIME = 0.55;
 const WIPE_TIME = 0.85;
 const TILT = 11;
-const FALL_CAPACITY = 6000;
+const FALL_CAPACITY = 2000;
 const FRAME_MS = 1000 / 30;
 
 export interface GardenOptions {
@@ -103,6 +105,11 @@ function material(
   );
 }
 
+// The camera starts on +z, so drawing near leaves first lets the depth test skip the leaves behind them.
+function frontFirst(a: { position: Vector3 }, b: { position: Vector3 }) {
+  return b.position.z - a.position.z;
+}
+
 function ramp(): IUniform<Ramp> {
   return {
     value: [new Vector3(), new Vector3(), new Vector3(), new Vector3()],
@@ -131,8 +138,7 @@ export function createGarden(
   depth.magFilter = LinearFilter;
   shadowTarget.depthTexture = depth;
 
-  const frameTarget = () =>
-    new WebGLRenderTarget(4, 4, { samples: 4, depthBuffer: true });
+  const frameTarget = () => new WebGLRenderTarget(4, 4, { depthBuffer: true });
   const fromTarget = frameTarget();
   const toTarget = frameTarget();
 
@@ -227,7 +233,6 @@ export function createGarden(
     glsl.leafFragment,
     crownUniforms,
     {
-      alphaToCoverage: true,
       side: DoubleSide,
     },
   );
@@ -244,7 +249,6 @@ export function createGarden(
     glsl.leafFragment,
     mossUniforms,
     {
-      alphaToCoverage: true,
       side: DoubleSide,
     },
   );
@@ -293,7 +297,6 @@ export function createGarden(
     uFrom: { value: fromTarget.texture },
     uTo: { value: toTarget.texture },
     uWipe: { value: 0 },
-    uWiping: { value: 0 },
     uAspect: { value: 1 },
     uTime: shared.uTime,
     uOrigin: { value: new Vector2(0.5, 0.2) },
@@ -362,6 +365,7 @@ export function createGarden(
       barkMaterial,
       barkDepthMaterial,
     );
+    tree.leaves.sort(frontFirst);
     const leaves = createLeafGeometry(tree.leaves);
     const crown = twin(leaves, crownMaterial, crownDepthMaterial);
     treeGroup.add(bark.visible, crown.visible);
@@ -379,7 +383,7 @@ export function createGarden(
     solidDepthMaterial,
   );
   const moss = new Mesh(
-    createLeafGeometry(scatterMoss(mound, gardenRng, 2400)),
+    createLeafGeometry(scatterMoss(mound, gardenRng, 2400).sort(frontFirst)),
     mossMaterial,
   );
   moss.frustumCulled = false;
@@ -791,9 +795,11 @@ export function createGarden(
 
   const width = Math.max(1, host.clientWidth);
   const height = Math.max(1, host.clientHeight);
+  renderer.setPixelRatio(RENDER_SCALE);
   renderer.setSize(width, height, false);
-  fromTarget.setSize(width, height);
-  toTarget.setSize(width, height);
+  const buffer = renderer.getDrawingBufferSize(new Vector2());
+  fromTarget.setSize(buffer.x, buffer.y);
+  toTarget.setSize(buffer.x, buffer.y);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   composeUniforms.uAspect.value = width / height;
@@ -876,6 +882,7 @@ export function createGarden(
     falling.flush();
   };
 
+  let drawn = 0;
   const draw = () => {
     const turn = MathUtils.degToRad(spin);
     const tilt = MathUtils.degToRad(TILT + tiltOffset);
@@ -923,19 +930,23 @@ export function createGarden(
     );
 
     applyLook(current);
-    renderer.setRenderTarget(shadowTarget);
-    renderer.clear();
-    renderer.render(casters, sunCamera);
+    if (drawn++ % SHADOW_EVERY === 0) {
+      renderer.setRenderTarget(shadowTarget);
+      renderer.clear();
+      renderer.render(casters, sunCamera);
+    }
 
+    if (!incoming) {
+      renderer.setRenderTarget(null);
+      renderer.render(scene, camera);
+      return;
+    }
     renderer.setRenderTarget(fromTarget);
     renderer.render(scene, camera);
-    composeUniforms.uWiping.value = incoming ? 1 : 0;
-    if (incoming) {
-      applyLook(incoming);
-      renderer.setRenderTarget(toTarget);
-      renderer.render(scene, camera);
-      composeUniforms.uWipe.value = easeInOutCubic(Math.min(1, wipe));
-    }
+    applyLook(incoming);
+    renderer.setRenderTarget(toTarget);
+    renderer.render(scene, camera);
+    composeUniforms.uWipe.value = easeInOutCubic(Math.min(1, wipe));
     renderer.setRenderTarget(null);
     renderer.render(screenScene, screenCamera);
   };

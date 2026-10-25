@@ -24,21 +24,33 @@ const shadow = /* glsl */ `
 uniform sampler2DShadow uShadowMap;
 uniform float uShadowRadius;
 
-const vec2 POISSON[8] = vec2[8](
+const vec2 POISSON[4] = vec2[4](
   vec2(-0.94201624, -0.39906216), vec2(0.94558609, -0.76890725),
-  vec2(-0.09418410, -0.92938870), vec2(0.34495938, 0.29387760),
-  vec2(-0.91588581, 0.45771432), vec2(0.97484398, 0.75648379),
-  vec2(-0.24188840, 0.99706507), vec2(0.53742981, -0.47373420)
+  vec2(-0.24188840, 0.99706507), vec2(0.34495938, 0.29387760)
 );
 
+vec3 shadowCoord(vec4 coord) {
+  return coord.xyz / coord.w * 0.5 + 0.5;
+}
+
+bool outsideShadow(vec3 c) {
+  return c.x < 0.0 || c.x > 1.0 || c.y < 0.0 || c.y > 1.0 || c.z > 1.0;
+}
+
 float sunlight(vec4 coord, float bias) {
-  vec3 c = coord.xyz / coord.w * 0.5 + 0.5;
-  if (c.x < 0.0 || c.x > 1.0 || c.y < 0.0 || c.y > 1.0 || c.z > 1.0) return 1.0;
+  vec3 c = shadowCoord(coord);
+  if (outsideShadow(c)) return 1.0;
   float lit = 0.0;
-  for (int i = 0; i < 8; i++) {
-    lit += texture(uShadowMap, vec3(c.xy + POISSON[i] * uShadowRadius, c.z - bias));
+  for (int i = 0; i < 4; i++) {
+    lit += textureLod(uShadowMap, vec3(c.xy + POISSON[i] * uShadowRadius, c.z - bias), 0.0);
   }
-  return lit / 8.0;
+  return lit / 4.0;
+}
+
+float sunlightOnce(vec4 coord, float bias) {
+  vec3 c = shadowCoord(coord);
+  if (outsideShadow(c)) return 1.0;
+  return textureLod(uShadowMap, vec3(c.xy, c.z - bias), 0.0);
 }
 `;
 
@@ -184,17 +196,16 @@ out vec4 fragColor;
 
 void main() {
   vec4 tex = atlasTexel(vShape, vUv);
-  float alpha = crispAlpha(tex.a);
-  if (alpha < 0.02) discard;
+  if (tex.a < 0.5) discard;
   vec3 n = normalize(vNormal);
-  float sun = sunlight(vShadowCoord, 0.0025);
+  float sun = sunlightOnce(vShadowCoord, 0.0025);
   float light = 0.06 + 0.94 * smoothstep(-0.35, 0.7, dot(n, uSunDir));
   light *= mix(0.5, 1.0, sun);
   light *= mix(0.45, 1.0, smoothstep(0.2, 0.98, vExposure));
   light += max(n.y, 0.0) * 0.12;
   float k = clamp(light + (vRnd - 0.5) * uVary + (tex.r - 0.9) * 0.6, 0.0, 1.0);
   vec3 color = rampColor(k) * mix(vec3(1.0), uSunColor, 0.15 * k);
-  fragColor = vec4(color, alpha);
+  fragColor = vec4(color, 1.0);
 }
 `;
 
@@ -330,27 +341,30 @@ float smoothMin(float a, float b, float k) {
 void main() {
   vec2 p = vWorld.xz;
   float r = length(p);
-  float d = r - uRakeRadius;
-  for (int i = 0; i < 6; i++) {
-    if (i >= uStoneCount) break;
-    vec4 stone = uStones[i];
-    d = smoothMin(d, length((p - stone.xy) / vec2(1.0, stone.w)) - stone.z, 0.6);
-  }
-
-  float k = d / 0.2;
-  float width = fwidth(k);
-  float toLine = abs(fract(k) - 0.5) * 2.0;
-  float groove = smoothstep(0.55 - width, 0.95 + width, 1.0 - toLine);
-  groove *= 1.0 - smoothstep(0.35, 0.7, width);
-  float near = smoothstep(5.5, 2.2, r) * smoothstep(0.0, 0.08, d);
   float gravel = smoothstep(11.5, 6.5, r);
-
   vec3 color = mix(uGround, uGravel, gravel);
-  color = mix(color, uRake, groove * near * uRakeStrength * 0.5);
-  color *= 1.0 + (hash12(floor(p * 55.0)) - 0.5) * 0.035 * gravel;
 
-  float lit = sunlight(vShadowCoord, 0.001);
-  color = mix(color, uShadowColor, (1.0 - lit) * uShadowStrength * smoothstep(15.0, 9.0, r));
+  if (r < 5.5) {
+    float d = r - uRakeRadius;
+    for (int i = 0; i < 6; i++) {
+      if (i >= uStoneCount) break;
+      vec4 stone = uStones[i];
+      d = smoothMin(d, length((p - stone.xy) / vec2(1.0, stone.w)) - stone.z, 0.6);
+    }
+    float k = d / 0.2;
+    float width = fwidth(k);
+    float toLine = abs(fract(k) - 0.5) * 2.0;
+    float groove = smoothstep(0.55 - width, 0.95 + width, 1.0 - toLine);
+    groove *= 1.0 - smoothstep(0.35, 0.7, width);
+    float near = smoothstep(5.5, 2.2, r) * smoothstep(0.0, 0.08, d);
+    color = mix(color, uRake, groove * near * uRakeStrength * 0.5);
+  }
+  if (gravel > 0.0) color *= 1.0 + (hash12(floor(p * 55.0)) - 0.5) * 0.035 * gravel;
+
+  if (r < 15.0) {
+    float lit = sunlight(vShadowCoord, 0.001);
+    color = mix(color, uShadowColor, (1.0 - lit) * uShadowStrength * smoothstep(15.0, 9.0, r));
+  }
   fragColor = vec4(color, 1.0);
 }
 `;
@@ -503,7 +517,7 @@ in vec4 vShadowCoord;
 out vec4 fragColor;
 
 vec3 knockedColor(vec4 tex) {
-  float sun = sunlight(vShadowCoord, 0.0025);
+  float sun = sunlightOnce(vShadowCoord, 0.0025);
   float k = 0.5 + (vRnd - 0.5) * 0.7 + (tex.r - 0.9) * 0.6 + (vFlip - 0.5) * 0.25 * (1.0 - vLanded);
   k = clamp(k, 0.0, 1.0) * mix(0.55, 1.0, sun * mix(1.0, 0.9, vLanded));
   return rampColor(k);
@@ -538,7 +552,6 @@ ${hash}
 uniform sampler2D uFrom;
 uniform sampler2D uTo;
 uniform float uWipe;
-uniform float uWiping;
 uniform float uAspect;
 uniform float uTime;
 uniform vec2 uOrigin;
@@ -551,21 +564,19 @@ const float RIM = 0.012;
 
 void main() {
   vec3 color = texture(uFrom, vUv).rgb;
-  if (uWiping > 0.5) {
-    vec3 next = texture(uTo, vUv).rgb;
-    vec2 q = (vUv - uOrigin) * vec2(uAspect, 1.0);
-    float theta = atan(q.y, q.x);
-    float phase = uWipe * 4.0;
-    float wobble = 1.0 + 0.045 * sin(theta * 5.0 + phase) + 0.025 * sin(theta * 9.0 - phase * 1.7 + 1.1) + 0.012 * sin(theta * 17.0 + phase * 2.3);
-    float edge = length(q) * wobble;
-    float front = uWipe * (length(vec2(uAspect, 1.0)) * 1.15 + RIM * 2.0);
-    float aa = 1.5 * fwidth(edge);
-    float inside = 1.0 - smoothstep(front - RIM - aa, front - RIM + aa, edge);
-    float rim = smoothstep(front - RIM - aa, front - RIM + aa, edge) * (1.0 - smoothstep(front - aa, front + aa, edge));
-    float ahead = (1.0 - smoothstep(front, front + 0.03, edge)) * (1.0 - rim) * (1.0 - inside);
-    color = mix(color * (1.0 - 0.12 * ahead), next, inside);
-    color = mix(color, uRim, rim);
-  }
+  vec3 next = texture(uTo, vUv).rgb;
+  vec2 q = (vUv - uOrigin) * vec2(uAspect, 1.0);
+  float theta = atan(q.y, q.x);
+  float phase = uWipe * 4.0;
+  float wobble = 1.0 + 0.045 * sin(theta * 5.0 + phase) + 0.025 * sin(theta * 9.0 - phase * 1.7 + 1.1) + 0.012 * sin(theta * 17.0 + phase * 2.3);
+  float edge = length(q) * wobble;
+  float front = uWipe * (length(vec2(uAspect, 1.0)) * 1.15 + RIM * 2.0);
+  float aa = 1.5 * fwidth(edge);
+  float inside = 1.0 - smoothstep(front - RIM - aa, front - RIM + aa, edge);
+  float rim = smoothstep(front - RIM - aa, front - RIM + aa, edge) * (1.0 - smoothstep(front - aa, front + aa, edge));
+  float ahead = (1.0 - smoothstep(front, front + 0.03, edge)) * (1.0 - rim) * (1.0 - inside);
+  color = mix(color * (1.0 - 0.12 * ahead), next, inside);
+  color = mix(color, uRim, rim);
   color += (hash12(gl_FragCoord.xy + fract(uTime) * 61.0) - 0.5) / 255.0;
   fragColor = vec4(color, 1.0);
 }
