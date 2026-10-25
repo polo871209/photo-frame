@@ -11,6 +11,7 @@ import "./styles/menu.css";
 import "./styles/calendar.css";
 import "./styles/music.css";
 import "./styles/weather.css";
+import "./styles/garden.css";
 import { render } from "preact";
 import { App } from "./App";
 

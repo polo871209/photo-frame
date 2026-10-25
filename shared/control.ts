@@ -1,4 +1,4 @@
-const SCREEN_IDS = ["calendar", "music", "weather"] as const;
+export const SCREEN_IDS = ["calendar", "music", "weather", "garden"] as const;
 export type ScreenId = (typeof SCREEN_IDS)[number];
 
 /** Settings the worker keeps and sends to every frame when they change or a frame connects. */
@@ -10,6 +10,8 @@ export interface FrameSettings {
   volume: number;
   /** Play a chime before each timed event of a shown calendar. */
   chimes: boolean;
+  /** Show the garden after a while with no touch, on every screen but music. */
+  screensaver: boolean;
 }
 
 export const DEFAULT_SETTINGS: FrameSettings = {
@@ -17,6 +19,7 @@ export const DEFAULT_SETTINGS: FrameSettings = {
   brightness: 0.8,
   volume: 0.33,
   chimes: true,
+  screensaver: true,
 };
 
 /** Sent as JSON to `POST /api/control`, or by the frame over its `/api/control` WebSocket. */
@@ -45,7 +48,7 @@ export const PONG = "pong";
 export const HEARTBEAT_MS = 25_000;
 
 export const COMMAND_SHAPES = [
-  `{"type":"set","settings":{"screenOn"?:boolean,"brightness"?:number in (0,1],"volume"?:number in [0,1],"chimes"?:boolean}}`,
+  `{"type":"set","settings":{"screenOn"?:boolean,"brightness"?:number in (0,1],"volume"?:number in [0,1],"chimes"?:boolean,"screensaver"?:boolean}}`,
   `{"type":"show","screen":${SCREEN_IDS.map((id) => `"${id}"`).join("|")}}`,
   `{"type":"reload"}`,
   `{"type":"restart"}`,
@@ -77,10 +80,8 @@ export function parseCommand(value: unknown): FrameCommand | undefined {
 
 function parseSettings(value: unknown): Partial<FrameSettings> | undefined {
   if (typeof value !== "object" || value === null) return undefined;
-  const { screenOn, brightness, volume, chimes, ...rest } = value as Record<
-    string,
-    unknown
-  >;
+  const { screenOn, brightness, volume, chimes, screensaver, ...rest } =
+    value as Record<string, unknown>;
   if (Object.keys(rest).length) return undefined;
   const settings: Partial<FrameSettings> = {};
   if (typeof screenOn === "boolean") settings.screenOn = screenOn;
@@ -93,5 +94,7 @@ function parseSettings(value: unknown): Partial<FrameSettings> | undefined {
   } else if (volume !== undefined) return undefined;
   if (typeof chimes === "boolean") settings.chimes = chimes;
   else if (chimes !== undefined) return undefined;
+  if (typeof screensaver === "boolean") settings.screensaver = screensaver;
+  else if (screensaver !== undefined) return undefined;
   return Object.keys(settings).length ? settings : undefined;
 }

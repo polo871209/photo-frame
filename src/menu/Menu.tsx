@@ -66,7 +66,12 @@ export function Menu({
         aria-hidden={!open}
         onPointerDown={() => setTouchedAt(Date.now())}
       >
-        <DeviceSettings control={control} onClose={() => setOpen(false)} />
+        <DeviceSettings
+          control={control}
+          garden={screen === "garden"}
+          onGarden={() => onPick("garden")}
+          onClose={() => setOpen(false)}
+        />
       </div>
     </div>
   );
@@ -74,9 +79,13 @@ export function Menu({
 
 function DeviceSettings({
   control,
+  garden,
+  onGarden,
   onClose,
 }: {
   control: FrameControl;
+  garden: boolean;
+  onGarden: () => void;
   onClose: () => void;
 }) {
   const { settings, preview, send } = control;
@@ -118,6 +127,24 @@ function DeviceSettings({
           on={settings.chimes}
           onToggle={() => save({ chimes: !settings.chimes })}
         />
+        <Toggle
+          icon="tree"
+          label="Screensaver"
+          on={settings.screensaver}
+          onToggle={() => save({ screensaver: !settings.screensaver })}
+        />
+      </div>
+      <div class="dev-actions">
+        <button
+          class={`dev-action${garden ? " is-on" : ""}`}
+          onClick={() => {
+            onClose();
+            onGarden();
+          }}
+        >
+          <Icon name="tree" />
+          Garden
+        </button>
       </div>
       <div class="dev-actions">
         <button

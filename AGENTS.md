@@ -19,7 +19,7 @@ The frame is an HY-S101 (Rockchip RK3326, Android 8.1 Go, about 976 MB RAM, 32-b
 - **Browser:** Android System WebView 106. `vite.config.ts` sets `build.target: chrome106` and `cssTarget: chrome61`. Keep `cssTarget` at `chrome61`, because WebView 106 rejects the 4- and 8-digit hex colors that newer targets let the minifier write.
 - **CSS:** write flat CSS. Use `rgb(var(--c-rgb) / .12)` for tints. Nesting, `color-mix()`, `oklch()` and `dvh` units do not work in WebView 106.
 - **Screen:** 1280×800 at 160 dpi, touch only. `src/App.tsx` draws a fixed 1280×800 `.stage` and scales it to the window, so lay out in fixed pixels for that size. Hover states never show. Tap targets are at least `--tap` (52px).
-- **Memory and CPU:** the frame is slow. Keep the bundle small (now 54 KB JS, 20 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time.
+- **Memory and CPU:** the frame is slow. Keep the bundle small (now 57 KB JS, 21 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time. The garden's three.js chunk (`scene-*.js`, 146 KB gzipped) loads only when the garden shows, so keep every import of `three` behind the dynamic `import("./scene")` in `src/garden/Garden.tsx`.
 - **Unattended:** nobody presses reload. Every fetch must fail soft and retry on the next refresh. `index.html` reloads the page if the bundle did not mount within 10 s.
 
 ## Time zone follows the system
@@ -36,11 +36,12 @@ The frame's system time zone is `Asia/Kuala_Lumpur` (`getprop persist.sys.timezo
 - `worker/`: the Cloudflare Worker. It runs first on every path (`run_worker_first: true` in `wrangler.jsonc`), checks the client certificate, serves `/api/*` itself and passes everything else to the static assets.
 - `shared/`: types used by both the worker and the client. Change the API contract here first.
 - `src/App.tsx`: the stage and the list of screens. The open screen is saved in `localStorage` (`frame.screen`).
-- `src/menu/Menu.tsx`: the top right of every screen. Icon buttons for the screens sit left of the clock, and a tap on the clock opens the device settings: brightness, volume, dark mode, event chimes, screen off and restart. Each screen gets the full 1280×800, so keep the top right `--menu-w` wide and `--head-h` high free of controls, and size a screen's own header row with `--head-h`. `--menu-w` in `tokens.css` fits three screen buttons, so widen it when you add a screen.
+- `src/menu/Menu.tsx`: the top right of every screen. Icon buttons for the screens sit left of the clock, and a tap on the clock opens the device settings: brightness, volume, dark mode, event chimes, screensaver, the garden, screen off and restart. Each screen gets the full 1280×800, so keep the top right `--menu-w` wide and `--head-h` high free of controls, and size a screen's own header row with `--head-h`. `--menu-w` in `tokens.css` fits three screen buttons. Open any further screen from the device settings, as the garden does, so the row stays at three.
 - `src/calendar/`: the calendar screen. `views.ts` is the one list of views and owns each view's range, step and title. `prefs.ts` keeps each device's hidden calendars, color choices and home view in `localStorage`. `SettingsSheet.tsx` edits the calendars, and the view switcher sets the home view. `layout.ts` places overlapping timed events in columns and packs all-day bars into rows.
 - `src/control/useFrameControl.ts`: the WebSocket that receives pushed commands. See [Push commands to the frame](#push-commands-to-the-frame).
 - `src/music/`: the music screen. It shows the track that plays on the owner's Spotify account, on any device, and the next tracks in the queue.
 - `src/weather/`: the weather screen for SS2, Petaling Jaya. It shows the air quality nearby, the 7-day forecast, and the summary and hours of today or the tapped day.
+- `src/garden/`: the garden, a three.js scene of one tree adapted from `~/app/garden-tree`. It is a screen and the screensaver. See [The garden is the screen and the screensaver](#the-garden-is-the-screen-and-the-screensaver).
 - `src/styles/`: `tokens.css` (colors, fonts, sizes), `base.css` (controls shared by all screens), and one file per screen.
 
 New screens (tasks, photos) go in `src/<screen>/` with their own CSS file, and their data routes go under `/api/<screen>` in the worker. Add each screen to `SCREENS` in `src/App.tsx`. Screen space is the limit, so a screen has no rounded corners or padding that it does not need.
@@ -81,6 +82,16 @@ The worker reads the owner's playback through the Spotify Web API (`worker/spoti
 - Keep the station and sensor readings. Open-Meteo's air quality API is a model, and in October 2026 it read US AQI 113 when the KL stations read 80 and 94.
 - The worker caches each source for 10 min at the edge, and the screen polls every 10 min while it is open. If a source fails, its part of the response is `null`, and the client keeps that part's last answer.
 - Each day button at the bottom opens that day: its summary and its 6 AM to 9 PM hours. After 3 min with no touch, the screen goes back to today (`isIdle`).
+
+## The garden is the screen and the screensaver
+
+`src/garden/scene.ts` draws the tree with WebGL2 and custom GLSL3 shaders. `looks.ts` holds muted colors for each season, and the ground comes from Catppuccin Latte or Macchiato, so the garden follows the dark mode. A theme change while the garden shows plays the same wipe as a season change.
+
+- The garden screen has buttons for the four seasons and a new tree. The season is saved in `localStorage` (`frame.season`). A touch on the leaves knocks them down, and a drag on the ground turns the view.
+- The screensaver shows the garden without controls after 3 min with no touch (`isIdle`), on every screen except music and the garden itself. A tap closes it. `screensaver` in `FrameSettings` turns it on or off, and so does the "Screensaver" toggle in the device settings.
+- The scene draws at most 30 frames per second and stops while the page is hidden. The garden unmounts while the screen is off, which frees its WebGL context.
+- The frame's GPU is a Mali-G31. To keep it fast, the shadow map is 1024 px with 8 samples, and the render targets use 8-bit color. Look at the garden on the frame (`pnpm frame screenshot`) after each change to `scene.ts` or `shaders.ts`.
+- `pnpm screenshots` needs WebGL in headless Chrome, so it starts Chrome with `--enable-unsafe-swiftshader`.
 
 ## Style comes from the old dashboard
 
@@ -127,8 +138,9 @@ The frame keeps a WebSocket open to `/api/control`, and the `FrameControl` Durab
 
 - `pnpm frame status` prints the settings and `frames`, the number of open WebSockets. `frames: 0` means that the frame is offline or reconnecting.
 - `pnpm frame screen off` shows a black screen and powers the backlight off. `pnpm frame screen on` undoes it, and so does a tap on the black screen. `pnpm frame brightness 1-100` sets the backlight while the screen is on, and `pnpm frame volume 0-100` sets the media volume. These settings survive reloads and deploys, and the device settings on the frame change the same ones.
-- `pnpm frame show calendar|music|weather` opens a screen. `pnpm frame reload` reloads the page at once, and `pnpm frame restart` restarts the kiosk app, which also drops WebView's TLS sessions. The kiosk restarts itself every night at 04:00.
+- `pnpm frame show calendar|music|weather|garden` opens a screen. `pnpm frame reload` reloads the page at once, and `pnpm frame restart` restarts the kiosk app, which also drops WebView's TLS sessions. The kiosk restarts itself every night at 04:00.
 - `pnpm frame chimes on|off` turns the chime 5 min before each timed event on or off (`src/calendar/useChimes.ts`). Chimes are silent while the screen is off. `pnpm frame chime` plays one chime to test the speaker.
+- `pnpm frame screensaver on|off` turns the garden screensaver on or off.
 - `pnpm frame screenshot` saves what the frame shows to `screenshots/frame-<time>.jpg`, through `/api/control/screenshot`.
 
 The script sends the frame's client certificate from `~/.config/photo-frame/mtls/`. `FRAME_URL=http://localhost:5173 pnpm frame …` targets `pnpm dev`.

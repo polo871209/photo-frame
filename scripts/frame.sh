@@ -3,7 +3,7 @@ set -eu
 
 usage() {
   echo "usage: pnpm frame [status | screen on|off | brightness 1-100 | volume 0-100 | chimes on|off | chime" >&2
-  echo "                  | show calendar|music|weather | reload | restart | screenshot]" >&2
+  echo "                  | screensaver on|off | show calendar|music|weather|garden | reload | restart | screenshot]" >&2
   exit 2
 }
 
@@ -32,6 +32,7 @@ case "${1:-status}" in
   status) body= ;;
   screen) switch screenOn "${2:-}" ;;
   chimes) switch chimes "${2:-}" ;;
+  screensaver) switch screensaver "${2:-}" ;;
   brightness) percent brightness 1 "${2:-}" ;;
   volume) percent volume 0 "${2:-}" ;;
   chime) body='{"type":"chime"}' ;;
@@ -49,7 +50,7 @@ case "${1:-status}" in
     exit ;;
   show)
     case "${2:-}" in
-      calendar | music | weather) body="{\"type\":\"show\",\"screen\":\"$2\"}" ;;
+      calendar | music | weather | garden) body="{\"type\":\"show\",\"screen\":\"$2\"}" ;;
       *) usage ;;
     esac ;;
   reload) body='{"type":"reload"}' ;;

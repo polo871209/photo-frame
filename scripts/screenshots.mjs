@@ -10,13 +10,15 @@ mkdirSync(outDir, { recursive: true });
 const browser = await chromium.launch({
   executablePath:
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  // Headless Chrome draws WebGL, which the garden needs, only through SwiftShader, and no longer enables it by default.
+  args: ["--enable-unsafe-swiftshader"],
 });
 const errors = [];
 for (const theme of themes) await shoot(theme);
 await browser.close();
 
 console.log(
-  `Wrote ${themes.length * (views.length + 6)} screenshots to ${outDir}`,
+  `Wrote ${themes.length * (views.length + 7)} screenshots to ${outDir}`,
 );
 if (errors.length) {
   console.error(errors.join("\n"));
@@ -70,6 +72,11 @@ async function shoot(theme) {
   await page.click(".wx-day:nth-child(2)");
   await page.waitForTimeout(300);
   await page.screenshot({ path: path("WeatherDay") });
+  await page.click(".menu-btn");
+  await page.click('.dev-action:has-text("Garden")');
+  await page.waitForSelector(".garden canvas");
+  await page.waitForTimeout(4000);
+  await page.screenshot({ path: path("Garden") });
   await page.click('.menu-screens [aria-label="Calendar"]');
   await page.close();
 }

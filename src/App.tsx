@@ -1,7 +1,8 @@
 import { useEffect, useState } from "preact/hooks";
-import type { ScreenId } from "../shared/control";
+import { SCREEN_IDS, type ScreenId } from "../shared/control";
 import { Calendar } from "./calendar/Calendar";
 import { useFrameControl } from "./control/useFrameControl";
+import { Garden } from "./garden/Garden";
 import { isIdle } from "./lib/idle";
 import { prefetchThenReload } from "./lib/reload";
 import { Menu, type ScreenEntry } from "./menu/Menu";
@@ -41,6 +42,23 @@ export function App() {
     return () => clearInterval(timer);
   }, [control.buildChanged, screenOn]);
 
+  const [saving, setSaving] = useState(false);
+  const canSave =
+    control.settings.screensaver &&
+    screenOn &&
+    screen !== "music" &&
+    screen !== "garden";
+  useEffect(() => {
+    if (!canSave) {
+      setSaving(false);
+      return;
+    }
+    const timer = setInterval(() => {
+      if (isIdle()) setSaving(true);
+    }, 5_000);
+    return () => clearInterval(timer);
+  }, [canSave]);
+
   return (
     <div class="stage" style={`transform:scale(${scale})`}>
       <main class="screen" hidden={screen !== "calendar"}>
@@ -56,7 +74,17 @@ export function App() {
           <Weather />
         </main>
       )}
+      {screen === "garden" && screenOn && (
+        <main class="screen">
+          <Garden interactive />
+        </main>
+      )}
       <Menu screens={SCREENS} screen={screen} onPick={pick} control={control} />
+      {saving && (
+        <div class="garden-saver" onClick={() => setSaving(false)}>
+          <Garden interactive={false} />
+        </div>
+      )}
       {!screenOn && (
         <button
           class="sleep"
@@ -72,7 +100,7 @@ export function App() {
 
 function savedScreen(): ScreenId {
   const saved = localStorage.getItem(SCREEN_KEY);
-  return SCREENS.find(({ id }) => id === saved)?.id ?? "calendar";
+  return SCREEN_IDS.find((id) => id === saved) ?? "calendar";
 }
 
 function fitScale(): number {
