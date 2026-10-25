@@ -1,7 +1,9 @@
+import { findLyrics } from "./lyrics";
 import {
   NEXT_UP_COUNT,
   SUGGESTION_COUNT,
   TOP_TRACK_COUNT,
+  type Lyrics,
   type Suggestions,
   type NowPlaying,
   type PlayerCommand,
@@ -89,6 +91,9 @@ export async function handleSpotify(
         ? await suggestions(credentials)
         : sampleSuggestions();
       return Response.json(body, { headers });
+    }
+    if (path === "/api/spotify/lyrics" && request.method === "GET") {
+      return await cachedLyrics(request, credentials);
     }
     if (path === "/api/spotify/control" && request.method === "POST") {
       const command = parseCommand(await request.json().catch(() => null));
@@ -208,6 +213,64 @@ function sampleSuggestions(): Suggestions {
       sampleTrack("Open Eye Signal", "Jon Hopkins", 7.9),
       sampleTrack("Hold On", "Sault", 3.5),
     ],
+  };
+}
+
+// LRCLIB rate-limits Cloudflare's shared egress addresses, so ask it once per track and colo.
+async function cachedLyrics(
+  request: Request,
+  credentials: SpotifyCredentials | null,
+): Promise<Response> {
+  const key = new Request(request.url);
+  const cached = await caches.default.match(key);
+  const body: Lyrics = cached
+    ? await cached.json()
+    : credentials
+      ? await lyrics(
+          credentials,
+          new URL(request.url).searchParams.get("uri") ?? "",
+        )
+      : sampleLyrics();
+  if (!cached && credentials) {
+    await caches.default.put(
+      key,
+      Response.json(body, { headers: { "Cache-Control": "max-age=604800" } }),
+    );
+  }
+  return Response.json(body, {
+    headers: { "Cache-Control": "private, max-age=86400" },
+  });
+}
+
+async function lyrics(
+  credentials: SpotifyCredentials,
+  uri: string,
+): Promise<Lyrics> {
+  if (!uri.startsWith("spotify:track:")) return { kind: "none" };
+  const token = await accessToken(credentials);
+  const track = await getJson<SpotifyItem>(
+    `/tracks/${uri.split(":").at(-1)}`,
+    token,
+  );
+  if (!track) return { kind: "none" };
+  return findLyrics({
+    title: track.name,
+    artist: track.artists?.[0]?.name ?? "",
+    album: track.album?.name ?? "",
+    durationMs: track.duration_ms,
+  });
+}
+
+function sampleLyrics(): Lyrics {
+  const words = [
+    "Sample lyrics for the sample track",
+    "Each line lights up in time",
+    "",
+    "Connect Spotify to see the real ones",
+  ];
+  return {
+    kind: "synced",
+    lines: words.map((text, index) => ({ timeMs: index * 6_000, text })),
   };
 }
 

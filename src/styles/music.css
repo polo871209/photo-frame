@@ -28,14 +28,31 @@
   background: var(--paper-2); color: var(--ink-2);
   font-size: 13px; font-weight: 800; font-family: var(--condensed); letter-spacing: .06em; text-transform: uppercase;
 }
-.music-status.is-error { background: var(--alert); color: #fff; }
+.music-status.is-error { background: var(--alert); color: var(--paper); }
 .music-info--empty { padding: 0 64px; }
 .music-ctl { display: flex; align-items: center; gap: 4px; margin-top: 16px; }
 .music-ctl button { width: 56px; height: 56px; display: grid; place-items: center; color: var(--ink); }
 .music-ctl button:active { background: var(--paper-2); }
 .music-ctl .is-main { background: var(--ink); color: var(--paper); }
 .music-ctl .is-main:active { background: var(--ink-2); }
+.music-ctl .music-ctl-lyrics { margin-left: auto; }
+.music-ctl .music-ctl-lyrics.is-on { background: var(--line); }
 .music-ctl .music-ctl-pick { margin-left: auto; }
+.music-ctl .music-ctl-lyrics + .music-ctl-pick { margin-left: 0; }
+.music-info.is-lyrics { justify-content: flex-start; padding-top: 84px; }
+.is-lyrics .music-title { font-size: 32px; -webkit-line-clamp: 2; }
+.is-lyrics .music-artist { margin-top: 6px; font-size: 20px; }
+.is-lyrics .music-bar { margin-top: 16px; }
+.music-lyrics {
+  position: relative; flex: 1; min-height: 0; overflow-y: auto; list-style: none;
+  margin: 16px -28px 0; padding: 24px 28px 160px;
+  -webkit-mask-image: linear-gradient(transparent, #000 24px, #000 calc(100% - 64px), transparent);
+}
+.music-lyrics li { padding: 6px 0; font-size: 26px; font-weight: 700; line-height: 1.25; color: var(--mute); transition: color .2s; }
+.music-lyrics li.is-past { color: var(--ink-2); opacity: .45; }
+.music-lyrics li.is-now { color: var(--ink); }
+.music-lyrics.is-static li { color: var(--ink-2); opacity: 1; }
+.music-lyrics-note { margin-top: 32px; font-size: 22px; color: var(--mute); }
 .music-pick { position: absolute; left: 0; top: 0; z-index: 10; width: 800px; height: 100%; display: flex; flex-direction: column; background: var(--paper); border-right: 1px solid var(--line); }
 .music-pick-x { position: absolute; top: 0; right: 0; z-index: 1; width: 56px; height: 56px; display: grid; place-items: center; background: var(--paper); }
 .music-pick-x:active { background: var(--paper-2); }

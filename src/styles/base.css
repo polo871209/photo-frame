@@ -68,6 +68,8 @@ h1, h2, p { margin: 0; font-weight: inherit; }
 }
 .menu-item:active { background: var(--paper-2); }
 .menu-item.is-on { background: var(--ink); color: var(--paper); }
+.menu-theme { position: relative; margin-top: 9px; }
+.menu-theme::before { content: ''; position: absolute; top: -7px; left: 10px; right: 10px; border-top: 1px solid var(--line); }
 .menu.is-open { pointer-events: auto; }
 .menu.is-open .menu-scrim, .menu.is-open .menu-list { opacity: 1; visibility: visible; transition-delay: 0s; }
 .menu.is-open .menu-list { transform: none; }

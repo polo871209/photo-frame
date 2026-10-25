@@ -7,17 +7,29 @@ import { Suggestions } from "./Suggestions";
 import { clock, TrackRow } from "./TrackRow";
 import { useNowPlaying } from "./useNowPlaying";
 import { Art } from "./Art";
+import { LyricsView } from "./LyricsView";
+import { useLyrics } from "./useLyrics";
 
 const COMMAND_ERROR_MS = 6_000;
 const CONTROL_ICON_PX = 22;
+const LYRICS_KEY = "frame.lyrics";
 
 export function NowPlaying() {
   const { data, receivedAt, error, refresh } = useNowPlaying();
   const [picking, setPicking] = useState(false);
   const [commandError, setCommandError] = useState<string>();
+  const [lyricsOn, setLyricsOn] = useState(
+    () => localStorage.getItem(LYRICS_KEY) === "on",
+  );
   const track = data?.track;
   const playing = !!(data?.playing && track);
+  const lyrics = useLyrics(track?.uri, lyricsOn);
   useSecondTick(playing);
+
+  const toggleLyrics = () => {
+    localStorage.setItem(LYRICS_KEY, lyricsOn ? "off" : "on");
+    setLyricsOn(!lyricsOn);
+  };
 
   useEffect(() => {
     if (!commandError) return;
@@ -47,8 +59,10 @@ export function NowPlaying() {
     <Controls
       playing={playing}
       canSkip={!!track && !data?.playedAt}
+      lyricsOn={track ? lyricsOn : undefined}
       onCommand={run}
       onPick={() => setPicking(true)}
+      onToggleLyrics={toggleLyrics}
     />
   );
   const sheet = picking && (
@@ -82,13 +96,13 @@ export function NowPlaying() {
   return (
     <div class="music">
       <Art src={track.art} class="music-art" />
-      <div class="music-info">
+      <div class={`music-info${lyricsOn ? " is-lyrics" : ""}`}>
         <span class="label">
           {heading(data.playing, data.device, data.playedAt)}
         </span>
         <h1 class="music-title title">{track.title}</h1>
         <p class="music-artist">{track.artists}</p>
-        {track.album && <p class="music-album">{track.album}</p>}
+        {track.album && !lyricsOn && <p class="music-album">{track.album}</p>}
         {!data.playedAt && (
           <>
             <div class="music-bar">
@@ -101,7 +115,13 @@ export function NowPlaying() {
           </>
         )}
         {controls}
-        {data.next.length > 0 && (
+        {lyricsOn && (
+          <LyricsView
+            lyrics={lyrics}
+            positionMs={data.playedAt ? null : position}
+          />
+        )}
+        {!lyricsOn && data.next.length > 0 && (
           <>
             <span class="label music-next-label">Next up</span>
             <ol class="music-next">
@@ -122,16 +142,21 @@ export function NowPlaying() {
   );
 }
 
+/** `lyricsOn` is `undefined` when there is no track, which hides the lyrics toggle. */
 function Controls({
   playing,
   canSkip,
+  lyricsOn,
   onCommand,
   onPick,
+  onToggleLyrics,
 }: {
   playing: boolean;
   canSkip: boolean;
+  lyricsOn: boolean | undefined;
   onCommand: (command: PlayerCommand) => void;
   onPick: () => void;
+  onToggleLyrics: () => void;
 }) {
   return (
     <div class="music-ctl">
@@ -153,6 +178,16 @@ function Controls({
       {canSkip && (
         <button aria-label="Next" onClick={() => onCommand({ action: "next" })}>
           <Icon name="next" size={CONTROL_ICON_PX} />
+        </button>
+      )}
+      {lyricsOn !== undefined && (
+        <button
+          class={`music-ctl-lyrics${lyricsOn ? " is-on" : ""}`}
+          aria-label="Lyrics"
+          aria-pressed={lyricsOn}
+          onClick={onToggleLyrics}
+        >
+          <Icon name="lyrics" size={26} />
         </button>
       )}
       <button class="music-ctl-pick" aria-label="Pick music" onClick={onPick}>

@@ -59,3 +59,10 @@ export type PlayerCommand =
 
 export const SUGGESTION_COUNT = 8;
 export const TOP_TRACK_COUNT = 20;
+
+/** The body of `GET /api/spotify/lyrics?uri=`. A `synced` line starts at `timeMs` into the track. */
+export type Lyrics =
+  | { kind: "synced"; lines: { timeMs: number; text: string }[] }
+  | { kind: "plain"; lines: string[] }
+  | { kind: "instrumental" }
+  | { kind: "none" };

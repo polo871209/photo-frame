@@ -6,6 +6,7 @@ import { Icon, type IconName } from "./icons";
 import { clockParts } from "./lib/dates";
 import { isIdle } from "./lib/idle";
 import { prefetchThenReload } from "./lib/reload";
+import { useTheme } from "./lib/theme";
 import { useNow } from "./lib/useNow";
 import { NowPlaying } from "./music/NowPlaying";
 
@@ -70,6 +71,7 @@ function ScreenMenu({
   onPick: (id: ScreenId) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [theme, toggleTheme] = useTheme();
   const { time, period } = clockParts(useNow());
   useEffect(() => {
     if (!open) return;
@@ -105,6 +107,14 @@ function ScreenMenu({
             {label}
           </button>
         ))}
+        <button
+          class="menu-item menu-theme"
+          tabIndex={open ? 0 : -1}
+          onClick={toggleTheme}
+        >
+          <Icon name={theme === "dark" ? "sun" : "moon"} size={26} />
+          {theme === "dark" ? "Light" : "Dark"}
+        </button>
       </nav>
     </div>
   );

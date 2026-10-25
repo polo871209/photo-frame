@@ -3,10 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=1280, initial-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#F2EEE6" />
+    <meta name="theme-color" content="#EFF1F5" />
     <link rel="icon" href="data:," />
     <title>Frame</title>
-    <style>html { background: #F2EEE6; }</style>
+    <style>html { background: #EFF1F5; } html[data-theme="dark"] { background: #24273A; }</style>
+    <script>
+      if (localStorage.getItem("frame.theme") === "dark") document.documentElement.dataset.theme = "dark";
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -6,7 +6,7 @@
   background: var(--paper-2); color: var(--ink-2);
   font-size: 13px; font-weight: 800; font-family: var(--condensed); letter-spacing: .06em; text-transform: uppercase;
 }
-.cal-status.is-error { background: var(--alert); color: #fff; }
+.cal-status.is-error { background: var(--alert); color: var(--paper); }
 .cal-body { flex: 1; min-height: 0; position: relative; touch-action: pan-y; }
 
 .tg { height: 100%; display: flex; flex-direction: column; }
@@ -39,7 +39,7 @@
 }
 .tg-cols { position: absolute; top: 0; bottom: 0; left: var(--gutter); right: 0; display: grid; }
 .tg-col { position: relative; border-left: 1px solid var(--line); }
-.tg-col.is-today { background: rgba(17, 17, 17, .035); }
+.tg-col.is-today { background: rgb(var(--ink-rgb) / .04); }
 
 .ev {
   position: absolute; overflow: hidden;
@@ -54,7 +54,7 @@
 .ev.is-short { flex-direction: row; align-items: center; gap: 6px; padding-top: 0; padding-bottom: 0; }
 .ev.is-short .ev-title { min-width: 0; }
 .ev.is-short .ev-meta { flex: none; }
-.ev.is-past { opacity: .45; }
+.ev.is-past { background: rgb(var(--c-rgb) / .3); color: var(--ink-2); }
 .ev.is-now { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--c); z-index: 2; }
 
 .now-line { position: absolute; left: -1px; right: 0; height: 0; border-top: 2px solid var(--alert); z-index: 3; pointer-events: none; }
