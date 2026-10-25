@@ -11,8 +11,8 @@ export { FrameControl } from "./control";
 interface Env {
   ASSETS: Fetcher;
   FRAME_CONTROL: DurableObjectNamespace<FrameControl>;
-  /** JSON array of `{ "name", "url", "color" }`. `url` is a Google Calendar secret iCal address. */
-  CALENDARS?: string;
+  /** `CALENDARS` and every `CALENDARS_*` hold a JSON array of `{ "name", "url", "color" }`. `url` is a Google Calendar secret iCal address. */
+  [calendars: `CALENDARS${string}`]: string | undefined;
   /** The Spotify app that `pnpm spotify-login` signed in with, and the refresh token it got. If any is unset, `/api/spotify` returns a sample track. */
   SPOTIFY_CLIENT_ID?: string;
   SPOTIFY_CLIENT_SECRET?: string;
@@ -115,7 +115,8 @@ async function handleApi(
 
 async function handleControl(request: Request, env: Env): Promise<Response> {
   const control = env.FRAME_CONTROL.getByName("frame");
-  if (request.headers.get("Upgrade") === "websocket") return control.fetch(request);
+  if (request.headers.get("Upgrade") === "websocket")
+    return control.fetch(request);
   if (request.method === "GET") return noStore(await control.status());
   if (request.method !== "POST") return new Response(null, { status: 405 });
   const command = parseCommand(await request.json().catch(() => undefined));
@@ -169,23 +170,29 @@ function spotifyCredentials(env: Env): SpotifyCredentials | null {
 }
 
 function readCalendars(env: Env): CalendarConfig[] {
-  if (!env.CALENDARS) return [];
-  const parsed: unknown = JSON.parse(env.CALENDARS);
-  if (!Array.isArray(parsed)) throw new Error("CALENDARS must be a JSON array");
+  return Object.keys(env)
+    .filter((key) => key === "CALENDARS" || key.startsWith("CALENDARS_"))
+    .sort()
+    .flatMap((key) => parseCalendars(key, env[key as `CALENDARS${string}`]))
+    .map((calendar, index) => ({ ...calendar, id: `cal-${index}` }));
+}
+
+function parseCalendars(
+  key: string,
+  value: string | undefined,
+): Omit<CalendarConfig, "id">[] {
+  if (!value) return [];
+  const parsed: unknown = JSON.parse(value);
+  if (!Array.isArray(parsed)) throw new Error(`${key} must be a JSON array`);
   return parsed.map((entry: Partial<CalendarConfig>, index) => {
     if (
       typeof entry.url !== "string" ||
       typeof entry.name !== "string" ||
       typeof entry.color !== "string"
     ) {
-      throw new Error(`CALENDARS[${index}] needs string name, url and color`);
+      throw new Error(`${key}[${index}] needs string name, url and color`);
     }
-    return {
-      id: `cal-${index}`,
-      name: entry.name,
-      color: entry.color,
-      url: entry.url,
-    };
+    return { name: entry.name, color: entry.color, url: entry.url };
   });
 }
 

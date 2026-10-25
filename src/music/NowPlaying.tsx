@@ -12,24 +12,16 @@ import { useLyrics } from "./useLyrics";
 
 const COMMAND_ERROR_MS = 6_000;
 const CONTROL_ICON_PX = 22;
-const LYRICS_KEY = "frame.lyrics";
 
 export function NowPlaying() {
   const { data, receivedAt, error, refresh } = useNowPlaying();
-  const [picking, setPicking] = useState(false);
+  const [picking, togglePicking] = useSavedToggle("frame.picker");
   const [commandError, setCommandError] = useState<string>();
-  const [lyricsOn, setLyricsOn] = useState(
-    () => localStorage.getItem(LYRICS_KEY) === "on",
-  );
+  const [lyricsOn, toggleLyrics] = useSavedToggle("frame.lyrics");
   const track = data?.track;
   const playing = !!(data?.playing && track);
   const lyrics = useLyrics(track?.uri, lyricsOn);
   useSecondTick(playing);
-
-  const toggleLyrics = () => {
-    localStorage.setItem(LYRICS_KEY, lyricsOn ? "off" : "on");
-    setLyricsOn(!lyricsOn);
-  };
 
   useEffect(() => {
     if (!commandError) return;
@@ -62,19 +54,12 @@ export function NowPlaying() {
       canSkip={!!track && !data?.playedAt}
       lyricsOn={track ? lyricsOn : undefined}
       onCommand={run}
-      onPick={() => setPicking(true)}
+      picking={picking}
+      onTogglePicking={togglePicking}
       onToggleLyrics={toggleLyrics}
     />
   );
-  const sheet = picking && (
-    <Suggestions
-      onCommand={(command) => {
-        setPicking(false);
-        run(command);
-      }}
-      onClose={() => setPicking(false)}
-    />
-  );
+  const sheet = picking && <Suggestions onCommand={run} />;
 
   if (!data) return <div class="music">{status}</div>;
   if (!track) {
@@ -156,15 +141,17 @@ function Controls({
   playing,
   canSkip,
   lyricsOn,
+  picking,
   onCommand,
-  onPick,
+  onTogglePicking,
   onToggleLyrics,
 }: {
   playing: boolean;
   canSkip: boolean;
   lyricsOn: boolean | undefined;
+  picking: boolean;
   onCommand: (command: PlayerCommand) => void;
-  onPick: () => void;
+  onTogglePicking: () => void;
   onToggleLyrics: () => void;
 }) {
   return (
@@ -199,7 +186,12 @@ function Controls({
           <Icon name="lyrics" size={26} />
         </button>
       )}
-      <button class="music-ctl-pick" aria-label="Pick music" onClick={onPick}>
+      <button
+        class={`music-ctl-pick${picking ? " is-on" : ""}`}
+        aria-label="Pick music"
+        aria-pressed={picking}
+        onClick={onTogglePicking}
+      >
         <Icon name="grid" size={26} />
       </button>
     </div>
@@ -218,6 +210,15 @@ function heading(
   }
   const state = playing ? "Now playing" : "Paused";
   return device ? `${state} · ${device}` : state;
+}
+
+function useSavedToggle(key: string): [boolean, () => void] {
+  const [on, setOn] = useState(() => localStorage.getItem(key) === "on");
+  const toggle = () => {
+    localStorage.setItem(key, on ? "off" : "on");
+    setOn(!on);
+  };
+  return [on, toggle];
 }
 
 function useSecondTick(active: boolean) {

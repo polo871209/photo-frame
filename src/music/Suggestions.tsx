@@ -3,41 +3,48 @@ import type {
   PlayerCommand,
   Suggestions as SuggestionsBody,
 } from "../../shared/spotify";
-import { Icon } from "../icons";
 import { Art } from "./Art";
 import { fetchSuggestions } from "./player";
 import { TrackRow } from "./TrackRow";
 
-const AUTO_CLOSE_MS = 60_000;
+const REFRESH_MS = 10 * 60_000;
+const RETRY_MS = 15_000;
 
 export function Suggestions({
   onCommand,
-  onClose,
 }: {
   onCommand: (command: PlayerCommand) => void;
-  onClose: () => void;
 }) {
   const [body, setBody] = useState<SuggestionsBody>();
   const [error, setError] = useState<string>();
-  const [lastTouch, setLastTouch] = useState(0);
 
   useEffect(() => {
-    fetchSuggestions().then(setBody, (failure: Error) =>
-      setError(failure.message),
-    );
+    let timer: ReturnType<typeof setTimeout>;
+    let closed = false;
+    const load = () =>
+      fetchSuggestions().then(
+        (next) => {
+          if (closed) return;
+          setBody(next);
+          setError(undefined);
+          timer = setTimeout(load, REFRESH_MS);
+        },
+        (failure: Error) => {
+          if (closed) return;
+          setError(failure.message);
+          timer = setTimeout(load, RETRY_MS);
+        },
+      );
+    load();
+    return () => {
+      closed = true;
+      clearTimeout(timer);
+    };
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(onClose, AUTO_CLOSE_MS);
-    return () => clearTimeout(timer);
-  }, [lastTouch]);
-
   return (
-    <div class="music-pick" onPointerDown={() => setLastTouch(Date.now())}>
-      <button class="music-pick-x" aria-label="Close" onClick={onClose}>
-        <Icon name="close" />
-      </button>
-      {error ? (
+    <div class="music-pick">
+      {error && !body ? (
         <p class="music-pick-note">Not loaded · {error}</p>
       ) : !body ? (
         <p class="music-pick-note">Loading…</p>

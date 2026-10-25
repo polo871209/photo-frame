@@ -1,10 +1,10 @@
 import type { CalendarEvent, CalendarInfo } from "../shared/events";
 
 export const SAMPLE_CALENDARS: CalendarInfo[] = [
-  { id: "family", name: "Family", color: "#D8321F" },
-  { id: "work", name: "Work", color: "#2F5FD0" },
-  { id: "school", name: "School", color: "#00875A" },
-  { id: "holidays", name: "Holidays", color: "#C26A00" },
+  { id: "family", name: "Family", color: "#D20F39" },
+  { id: "work", name: "Work", color: "#1E66F5" },
+  { id: "school", name: "School", color: "#40A02B" },
+  { id: "holidays", name: "Holidays", color: "#FE640B" },
 ];
 
 interface Template {

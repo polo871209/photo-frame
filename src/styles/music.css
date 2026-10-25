@@ -36,7 +36,7 @@
 .music-ctl .is-main { background: var(--ink); color: var(--paper); }
 .music-ctl .is-main:active { background: var(--ink-2); }
 .music-ctl .music-ctl-lyrics { margin-left: auto; }
-.music-ctl .music-ctl-lyrics.is-on { background: var(--line); }
+.music-ctl .is-on { background: var(--line); }
 .music-ctl .music-ctl-pick { margin-left: auto; }
 .music-ctl .music-ctl-lyrics + .music-ctl-pick { margin-left: 0; }
 .music-info.is-lyrics { justify-content: flex-start; padding-top: calc(var(--head-h) + 32px); }
@@ -55,8 +55,6 @@
 .music-lyrics .is-static li { color: var(--ink-2); opacity: 1; }
 .music-lyrics-note { margin-top: 32px; font-size: 22px; color: var(--mute); }
 .music-pick { position: absolute; left: 0; top: 0; z-index: 10; width: 800px; height: 100%; display: flex; flex-direction: column; background: var(--paper); border-right: 1px solid var(--line); }
-.music-pick-x { position: absolute; top: 0; right: 0; z-index: 1; width: 56px; height: 56px; display: grid; place-items: center; background: var(--paper); }
-.music-pick-x:active { background: var(--paper-2); }
 .music-pick-note { padding: 8px 24px 24px; font-size: 20px; color: var(--mute); }
 .music-pick > .music-pick-note { padding-top: 32px; }
 .music-pick-body { flex: 1; min-height: 0; overflow-y: auto; padding: 32px 0 24px; }

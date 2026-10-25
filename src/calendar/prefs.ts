@@ -9,15 +9,15 @@ export interface CalendarPrefs {
 }
 
 export const WHITE_TEXT_COLORS = [
-  "#D50000",
-  "#F4511E",
-  "#E67C73",
-  "#0B8043",
-  "#33B679",
-  "#039BE5",
-  "#3F51B5",
-  "#8E24AA",
-  "#616161",
+  "#D20F39",
+  "#FE640B",
+  "#DD7878",
+  "#40A02B",
+  "#179299",
+  "#209FB5",
+  "#1E66F5",
+  "#8839EF",
+  "#6C6F85",
 ];
 
 const STORAGE_KEY = "frame.calendar-prefs";

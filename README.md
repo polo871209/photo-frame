@@ -31,7 +31,7 @@ The worker reads each calendar's secret iCal address. Nobody needs to sign in, a
 3. For local development, put the list in `.mise.toml` under `[env]`:
 
    ```toml
-   CALENDARS = '[{"name":"Family","url":"https://calendar.google.com/calendar/ical/.../basic.ics","color":"#D8321F"}]'
+   CALENDARS = '[{"name":"Family","url":"https://calendar.google.com/calendar/ical/.../basic.ics","color":"#D20F39"}]'
    ```
 
 4. For production, store the same JSON as a secret:
@@ -40,9 +40,11 @@ The worker reads each calendar's secret iCal address. Nobody needs to sign in, a
    mise exec -- pnpm exec wrangler secret put CALENDARS
    ```
 
+To add a calendar later, store it as its own secret whose name starts with `CALENDARS_`, for example `wrangler secret put CALENDARS_BRENDA` with a one-item JSON array. Wrangler cannot read a secret back, so this leaves the other calendars untouched. The worker reads `CALENDARS` and every `CALENDARS_*` secret in name order.
+
 Do not commit the iCal addresses. Anyone with the address can read the calendar.
 
-To hide a calendar or change its color, tap the sliders button at the top right of the frame. Each device stores these choices in its own `localStorage`, keyed by calendar name. The color in `CALENDARS` is the default, and its swatch is the first one in each row.
+To hide a calendar or change its color, tap the sliders button at the top right of the frame. Each device stores these choices in its own `localStorage`, keyed by calendar name. The color in `CALENDARS` is the default, and its swatch is the first one in each row. The other swatches are the [Catppuccin Latte](https://catppuccin.com/palette) accents, which keep white text readable.
 
 If a feed fails, the other calendars still show and the header names the calendar that did not load. The worker caches each feed for 30 seconds, and the client refreshes every 30 seconds.
 

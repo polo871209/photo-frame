@@ -49,7 +49,7 @@ New screens (tasks, photos) go in `src/<screen>/` with their own CSS file, and t
 
 The worker reads Google Calendar through each calendar's secret iCal address. There is no OAuth and no Google token on the frame.
 
-- The `CALENDARS` variable is a JSON array of `{name, url, color}`. In development it lives in `.mise.toml` under `[env]`, and in production it is a Wrangler secret. If `CALENDARS` is unset, the worker returns sample events from `worker/sample.ts`, and the header shows "Sample events".
+- `CALENDARS` and each `CALENDARS_*` variable hold a JSON array of `{name, url, color}`. The worker joins them in name order. To add a calendar, put a new `CALENDARS_<NAME>` secret, because Wrangler cannot read the existing ones back. In development it lives in `.mise.toml` under `[env]`, and in production it is a Wrangler secret. If `CALENDARS` is unset, the worker returns sample events from `worker/sample.ts`, and the header shows "Sample events".
 - Every path needs a TLS client certificate from the account's Cloudflare-managed CA. `hasClientCertificate` in `worker/index.ts` checks it before it serves assets through `env.ASSETS`, and answers 404 without one. `pnpm dev` skips the check (`import.meta.env.DEV`), and no other path may skip it. The frame's private key is in `~/.config/photo-frame/mtls/`. Never print it, log it or commit it. `README.md` and section 7 of `device/README.md` describe how to issue and install a certificate.
 - The iCal addresses are secrets, because anyone with one can read the calendar. Keep them out of commits, logs, screenshots and error messages. `failed` in the response lists calendar names only.
 - Feeds are cached for 30 s at the edge, and the client refetches every 30 s. Expansion stops at 5000 occurrences for each feed, and a request can cover at most 70 days.
@@ -116,7 +116,7 @@ The worker serves every file under `/assets/` with `Cache-Control: private, max-
 
 If the change is to the kiosk APK itself, install the APK as section 7 of `device/README.md` describes. ADB reaches the frame over Wi-Fi after `mise exec -- adb connect 192.168.68.73:5555` (section 8). If that fails and no USB cable is in, tell the owner that the frame still runs the old APK.
 
-Ask the owner before you change `CALENDARS` in production with `wrangler secret put`.
+Ask the owner before you change `CALENDARS` or a `CALENDARS_*` secret in production with `wrangler secret put`.
 
 After you change `wrangler.jsonc`, run `pnpm types` to regenerate `worker-configuration.d.ts`.
 
