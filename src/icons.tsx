@@ -8,6 +8,12 @@ const PATHS = {
   calendar: "M4 6h16v15H4z M4 10h16 M8 3v4 M16 3v4",
   notes: "M5 4h14v16H5z M8 9h8 M8 13h8 M8 17h5",
   sliders: "M4 7h9 M17 7h3 M4 17h3 M11 17h9 M15 5v4 M9 15v4",
+  // Device icons from Lucide (ISC): https://lucide.dev/icons/volume-2
+  volume:
+    "M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z M16 9a5 5 0 0 1 0 6 M19.364 18.364a9 9 0 0 0 0-12.728",
+  bell: "M10.268 21a2 2 0 0 0 3.464 0 M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326",
+  power: "M12 2v10 M18.4 6.6a9 9 0 1 1-12.77.04",
+  restart: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5",
   // Player icons from Lucide (ISC), the set Spotifast uses: https://lucide.dev/icons/play
   play: "M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z",
   pause:

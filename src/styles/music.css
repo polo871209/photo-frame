@@ -39,7 +39,7 @@
 .music-ctl .music-ctl-lyrics.is-on { background: var(--line); }
 .music-ctl .music-ctl-pick { margin-left: auto; }
 .music-ctl .music-ctl-lyrics + .music-ctl-pick { margin-left: 0; }
-.music-info.is-lyrics { justify-content: flex-start; padding-top: 84px; }
+.music-info.is-lyrics { justify-content: flex-start; padding-top: calc(var(--head-h) + 32px); }
 .is-lyrics .music-title { font-size: 32px; -webkit-line-clamp: 2; }
 .is-lyrics .music-artist { margin-top: 6px; font-size: 20px; }
 .is-lyrics .music-bar { margin-top: 16px; }

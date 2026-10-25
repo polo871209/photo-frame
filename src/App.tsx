@@ -2,12 +2,9 @@ import { useEffect, useState } from "preact/hooks";
 import type { ScreenId } from "../shared/control";
 import { Calendar } from "./calendar/Calendar";
 import { useFrameControl } from "./control/useFrameControl";
-import { Icon, type IconName } from "./icons";
-import { clockParts } from "./lib/dates";
 import { isIdle } from "./lib/idle";
 import { prefetchThenReload } from "./lib/reload";
-import { useTheme } from "./lib/theme";
-import { useNow } from "./lib/useNow";
+import { Menu, type ScreenEntry } from "./menu/Menu";
 import { NowPlaying } from "./music/NowPlaying";
 import { Weather } from "./weather/Weather";
 
@@ -19,7 +16,7 @@ const SCREENS = [
   { id: "calendar", label: "Calendar", icon: "calendar" },
   { id: "music", label: "Music", icon: "music" },
   { id: "weather", label: "Weather", icon: "cloudSun" },
-] as const satisfies readonly { id: ScreenId; label: string; icon: IconName }[];
+] as const satisfies readonly ScreenEntry[];
 
 export function App() {
   const [scale, setScale] = useState(fitScale);
@@ -59,7 +56,7 @@ export function App() {
           <Weather />
         </main>
       )}
-      <ScreenMenu screen={screen} onPick={pick} />
+      <Menu screens={SCREENS} screen={screen} onPick={pick} control={control} />
       {!screenOn && (
         <button
           class="sleep"
@@ -69,63 +66,6 @@ export function App() {
           }
         />
       )}
-    </div>
-  );
-}
-
-function ScreenMenu({
-  screen,
-  onPick,
-}: {
-  screen: ScreenId;
-  onPick: (id: ScreenId) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [theme, toggleTheme] = useTheme();
-  const { time, period } = clockParts(useNow());
-  useEffect(() => {
-    if (!open) return;
-    const timer = setTimeout(() => setOpen(false), 30_000);
-    return () => clearTimeout(timer);
-  }, [open]);
-
-  return (
-    <div class={`menu${open ? " is-open" : ""}`}>
-      <div class="menu-scrim" onClick={() => setOpen(false)} />
-      <button
-        class="menu-btn"
-        aria-label="Screens"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        <span class="num">{time}</span>
-        {period && <span class="label">{period}</span>}
-        <Icon name="down" size={20} />
-      </button>
-      <nav class="menu-list" aria-hidden={!open}>
-        {SCREENS.map(({ id, label, icon }) => (
-          <button
-            key={id}
-            class={`menu-item${id === screen ? " is-on" : ""}`}
-            tabIndex={open ? 0 : -1}
-            onClick={() => {
-              onPick(id);
-              setOpen(false);
-            }}
-          >
-            <Icon name={icon} size={26} />
-            {label}
-          </button>
-        ))}
-        <button
-          class="menu-item menu-theme"
-          tabIndex={open ? 0 : -1}
-          onClick={toggleTheme}
-        >
-          <Icon name={theme === "dark" ? "sun" : "moon"} size={26} />
-          {theme === "dark" ? "Light" : "Dark"}
-        </button>
-      </nav>
     </div>
   );
 }

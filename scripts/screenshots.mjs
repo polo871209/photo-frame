@@ -38,7 +38,7 @@ async function shoot(theme) {
   await page.waitForSelector(".cal");
   if (theme === "dark") {
     await page.click(".menu-btn");
-    await page.click(".menu-theme");
+    await page.click('.dev-toggle:has-text("Dark mode")');
     await page.click(".menu-scrim");
   }
   await page.waitForLoadState("networkidle");
@@ -59,19 +59,17 @@ async function shoot(theme) {
   await page.click(".menu-btn");
   await page.waitForTimeout(300);
   await page.screenshot({ path: path("Menu") });
-  await page.click('.menu-item:text-is("Music")');
+  await page.click('.menu-screens [aria-label="Music"]');
   await page.waitForSelector(".music-info");
   await page.waitForTimeout(300);
   await page.screenshot({ path: path("Music") });
-  await page.click(".menu-btn");
-  await page.click('.menu-item:text-is("Weather")');
+  await page.click('.menu-screens [aria-label="Weather"]');
   await page.waitForSelector(".wx-days");
   await page.waitForTimeout(300);
   await page.screenshot({ path: path("Weather") });
   await page.click(".wx-day:nth-child(2)");
   await page.waitForTimeout(300);
   await page.screenshot({ path: path("WeatherDay") });
-  await page.click(".menu-btn");
-  await page.click('.menu-item:text-is("Calendar")');
+  await page.click('.menu-screens [aria-label="Calendar"]');
   await page.close();
 }

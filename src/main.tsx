@@ -7,6 +7,7 @@ import "@fontsource/fira-sans-condensed/800.css";
 import "@fontsource/fira-sans-extra-condensed/800.css";
 import "./styles/tokens.css";
 import "./styles/base.css";
+import "./styles/menu.css";
 import "./styles/calendar.css";
 import "./styles/music.css";
 import "./styles/weather.css";

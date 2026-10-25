@@ -26,7 +26,9 @@
 
   --gutter: 64px;
   --tap: 52px;
-  --menu-w: 132px;
+  --head-h: 60px;
+  --clock-w: 156px;
+  --menu-w: 356px;
 }
 
 :root[data-theme="dark"] {
