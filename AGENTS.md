@@ -19,7 +19,7 @@ The frame is an HY-S101 (Rockchip RK3326, Android 8.1 Go, about 976 MB RAM, 32-b
 - **Browser:** Android System WebView 106. `vite.config.ts` sets `build.target: chrome106` and `cssTarget: chrome61`. Keep `cssTarget` at `chrome61`, because WebView 106 rejects the 4- and 8-digit hex colors that newer targets let the minifier write.
 - **CSS:** write flat CSS. Use `rgb(var(--c-rgb) / .12)` for tints. Nesting, `color-mix()`, `oklch()` and `dvh` units do not work in WebView 106.
 - **Screen:** 1280×800 at 160 dpi, touch only. `src/App.tsx` draws a fixed 1280×800 `.stage` and scales it to the window, so lay out in fixed pixels for that size. Hover states never show. Tap targets are at least `--tap` (52px).
-- **Memory and CPU:** the frame is slow. Keep the bundle small (now 57 KB JS, 21 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time. The garden's three.js chunk (`scene-*.js`, 146 KB gzipped) loads only when the garden shows, so keep every import of `three` behind the dynamic `import("./scene")` in `src/garden/Garden.tsx`.
+- **Memory and CPU:** the frame is slow. Keep the bundle small (now 58 KB JS, 22 KB gzipped, as `pnpm build` prints), add a dependency only when it removes real work, and avoid animations that run all the time. The garden's chunks (`mount-*.js`, `renderer-*.js` and `webgl-*.js`, 23 KB gzipped together) load only when the garden shows, so keep every import of `@opengardenjs/*` behind the dynamic `import("./mount")` in `src/garden/Garden.tsx`.
 - **Unattended:** nobody presses reload. Every fetch must fail soft and retry on the next refresh. `index.html` reloads the page if the bundle did not mount within 10 s.
 
 ## Time zone follows the system
@@ -41,7 +41,7 @@ The frame's system time zone is `Asia/Kuala_Lumpur` (`getprop persist.sys.timezo
 - `src/control/useFrameControl.ts`: the WebSocket that receives pushed commands. See [Push commands to the frame](#push-commands-to-the-frame).
 - `src/music/`: the music screen. It shows the track that plays on the owner's Spotify account, on any device, and the next tracks in the queue.
 - `src/weather/`: the weather screen for SS2, Petaling Jaya. It shows the air quality nearby, the 7-day forecast, and the summary and hours of today or the tapped day.
-- `src/garden/`: the garden, a three.js scene of one tree adapted from `~/app/garden-tree`. It is a screen and the screensaver. See [The garden is the screen and the screensaver](#the-garden-is-the-screen-and-the-screensaver).
+- `src/garden/`: the garden, one cherry tree from the [opengarden](https://github.com/polo871209/opengarden) packages. It is a screen and the screensaver. See [The garden is the screen and the screensaver](#the-garden-is-the-screen-and-the-screensaver).
 - `src/styles/`: `tokens.css` (colors, fonts, sizes), `base.css` (controls shared by all screens), and one file per screen.
 
 New screens (tasks, photos) go in `src/<screen>/` with their own CSS file, and their data routes go under `/api/<screen>` in the worker. Add each screen to `SCREENS` in `src/App.tsx`. Screen space is the limit, so a screen has no rounded corners or padding that it does not need.
@@ -85,13 +85,13 @@ The worker reads the owner's playback through the Spotify Web API (`worker/spoti
 
 ## The garden is the screen and the screensaver
 
-`src/garden/scene.ts` draws the tree with WebGL2 and custom GLSL3 shaders. `looks.ts` holds muted colors for each season, and the ground comes from Catppuccin Latte or Macchiato, so the garden follows the dark mode. A theme change while the garden shows plays the same wipe as a season change.
+`mountGarden` from `@opengardenjs/web` draws the tree. It uses WebGL2 on the frame, because WebView 106 has no WebGPU. `src/garden/mount.ts` holds the frame's options, and `src/garden/colors.ts` holds muted colors for each season, with the ground from Catppuccin Latte or Macchiato, so the garden follows the dark mode. A theme change while the garden shows plays the same wipe as a season change. To change how the garden draws, change opengarden (`~/app/opengarden`), release a new version, and update the `@opengardenjs/*` versions in `package.json`. Never use `link:` dependencies.
 
 - The garden screen has buttons for the four seasons. The season is saved in `localStorage` (`frame.season`). A touch on the leaves knocks them down, and a drag on the ground turns the view.
 - The screensaver shows the garden without controls after 3 min with no touch (`isIdle`), on every screen except music and the garden itself. A tap closes it. `screensaver` in `FrameSettings` turns it on or off, and so does the "Screensaver" toggle in the device settings.
 - The scene draws at most 30 frames per second and stops while the page is hidden. The garden unmounts while the screen is off, which frees its WebGL context.
-- The frame's Mali-G31 GPU limits the garden by fill rate. At full resolution it drew 8 frames per second. So the scene renders at 60% resolution (`RENDER_SCALE`) without MSAA, grows the tree at half the leaf density, and uses a 512 px shadow map that updates every second frame, with 4 samples for the ground and 1 for leaves.
-- After each change to `scene.ts` or `shaders.ts`, measure the frame rate on the frame with the garden open. Run `mise exec -- adb shell 'dumpsys gfxinfo com.wesbos.homehq reset; sleep 10; dumpsys gfxinfo com.wesbos.homehq'` and divide "Total frames rendered" by 10. `pnpm frame screenshot` does not capture WebGL, so look at the garden with `mise exec -- adb exec-out screencap -p > screenshots/frame.png`.
+- The frame's Mali-G31 GPU limits the garden by fill rate. At full resolution it drew 8 frames per second. So `mount.ts` sets `renderScale: 0.6` and a `quality` with no antialiasing, half the leaf density, and a 512 px shadow map that updates every second frame, with 4 samples for the ground and 1 for leaves. With these options the frame draws about 27 frames per second.
+- After each change to `mount.ts` or the opengarden version, measure the frame rate on the frame with the garden open. Run `mise exec -- adb shell 'dumpsys gfxinfo com.wesbos.homehq reset; sleep 10; dumpsys gfxinfo com.wesbos.homehq'` and divide "Total frames rendered" by 10. `pnpm frame screenshot` does not capture WebGL, so look at the garden with `mise exec -- adb exec-out screencap -p > screenshots/frame.png`.
 - `pnpm screenshots` needs WebGL in headless Chrome, so it starts Chrome with `--enable-unsafe-swiftshader`.
 
 ## Style comes from the old dashboard

@@ -1,37 +1,43 @@
+import type { Season } from "@opengardenjs/core";
+import type { MountedGarden } from "@opengardenjs/web";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { useTheme } from "../lib/theme";
-import { SEASONS, type Season } from "./seasons";
-import type { GardenScene } from "./scene";
+import { colorsFor } from "./colors";
 
 const SEASON_KEY = "frame.season";
+const SEASONS: readonly Season[] = ["spring", "summer", "autumn", "winter"];
 
 export function Garden({ interactive }: { interactive: boolean }) {
   const host = useRef<HTMLDivElement>(null);
-  const scene = useRef<GardenScene | null>(null);
+  const garden = useRef<MountedGarden | null>(null);
   const [season, setSeason] = useState(savedSeason);
   const [theme] = useTheme();
+  const latest = useRef({ season, theme });
+  latest.current = { season, theme };
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let unmounted = false;
-    import("./scene")
-      .then(({ createGarden }) => {
-        if (unmounted || !host.current) return;
-        scene.current = createGarden(host.current, {
-          season,
-          theme,
-          interactive,
-        });
+    import("./mount")
+      .then(({ mount }) =>
+        host.current
+          ? mount(host.current, latest.current.season, latest.current.theme)
+          : null,
+      )
+      .then((mounted) => {
+        if (unmounted) mounted?.dispose();
+        else garden.current = mounted;
       })
       .catch(() => setFailed(true));
     return () => {
       unmounted = true;
-      scene.current?.dispose();
-      scene.current = null;
+      garden.current?.dispose();
+      garden.current = null;
     };
   }, []);
 
-  useEffect(() => scene.current?.setLook(season, theme), [season, theme]);
+  useEffect(() => garden.current?.setSeason(season), [season]);
+  useEffect(() => garden.current?.setColors(colorsFor(theme)), [theme]);
 
   const pick = (next: Season) => {
     setSeason(next);
