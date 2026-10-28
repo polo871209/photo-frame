@@ -12,13 +12,21 @@ import { Garden } from "./Garden";
 const LOOKAHEAD_DAYS = 2;
 
 export function Screensaver({ onClose }: { onClose: () => void }) {
+  return (
+    <div class="garden-saver" onClick={onClose}>
+      <Garden controls={false} />
+      <SaverInfo />
+    </div>
+  );
+}
+
+export function SaverInfo() {
   const now = useNow();
   const { time, period } = clockParts(now);
   const current = useWeather().data?.forecast?.current;
 
   return (
-    <div class="garden-saver" onClick={onClose}>
-      <Garden interactive={false} />
+    <>
       <div class="saver-clock">
         <div class="saver-time">
           <span class="num">{time}</span>
@@ -39,7 +47,7 @@ export function Screensaver({ onClose }: { onClose: () => void }) {
         )}
         <NextEvent now={now} />
       </div>
-    </div>
+    </>
   );
 }
 

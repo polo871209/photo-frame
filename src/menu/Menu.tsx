@@ -124,6 +124,13 @@ function DeviceSettings({
           onToggle={() => save({ screensaver: !settings.screensaver })}
         />
         <Toggle
+          icon="clock"
+          label="Auto dark"
+          detail={`${clockTime(settings.darkStart)} – ${clockTime(settings.darkEnd)}`}
+          on={settings.dark}
+          onToggle={() => save({ dark: !settings.dark })}
+        />
+        <Toggle
           icon="power"
           label="Off at night"
           detail={`${clockTime(settings.nightStart)} – ${clockTime(settings.nightEnd)}`}

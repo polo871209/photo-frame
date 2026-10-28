@@ -13,6 +13,7 @@ import {
 import { minutesIntoDay, minutesOfClockTime } from "../lib/dates";
 import { isIdle } from "../lib/idle";
 import { prefetchThenReload } from "../lib/reload";
+import { applyTheme } from "../lib/theme";
 import { useNow } from "../lib/useNow";
 
 declare global {
@@ -128,6 +129,11 @@ export function useFrameControl(
     return () => clearInterval(timer);
   }, [night, nightWake]);
   const screenOn = settings.screenOn && (!night || nightWake);
+
+  const darkTime = inWindow(now, settings.darkStart, settings.darkEnd);
+  useEffect(() => {
+    if (settings.dark) applyTheme(darkTime ? "dark" : "light");
+  }, [settings.dark, darkTime]);
 
   const level = screenOn ? settings.brightness : 0;
   useEffect(() => window.Kiosk?.setBrightness(level), [level]);

@@ -14,6 +14,10 @@ export interface FrameSettings {
   night: boolean;
   nightStart: string;
   nightEnd: string;
+  /** Switch to the dark theme at `darkStart` and back to the light theme at `darkEnd`, both `HH:MM` in the frame's local time. */
+  dark: boolean;
+  darkStart: string;
+  darkEnd: string;
 }
 
 export const DEFAULT_SETTINGS: FrameSettings = {
@@ -24,9 +28,10 @@ export const DEFAULT_SETTINGS: FrameSettings = {
   night: false,
   nightStart: "23:00",
   nightEnd: "07:00",
+  dark: false,
+  darkStart: "21:00",
+  darkEnd: "07:00",
 };
-
-const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** Sent as JSON to `POST /api/control`, or by the frame over its `/api/control` WebSocket. */
 export type FrameCommand =
@@ -53,7 +58,7 @@ export const PONG = "pong";
 export const HEARTBEAT_MS = 25_000;
 
 export const COMMAND_SHAPES = [
-  `{"type":"set","settings":{"screenOn"?:boolean,"brightness"?:number in (0,1],"volume"?:number in [0,1],"screensaver"?:boolean,"night"?:boolean,"nightStart"?:"HH:MM","nightEnd"?:"HH:MM"}}`,
+  `{"type":"set","settings":{"screenOn"?:boolean,"brightness"?:number in (0,1],"volume"?:number in [0,1],"screensaver"?:boolean,"night"?:boolean,"nightStart"?:"HH:MM","nightEnd"?:"HH:MM","dark"?:boolean,"darkStart"?:"HH:MM","darkEnd"?:"HH:MM"}}`,
   `{"type":"show","screen":${SCREEN_IDS.map((id) => `"${id}"`).join("|")}}`,
   `{"type":"reload"}`,
   `{"type":"restart"}`,
@@ -78,37 +83,32 @@ export function parseCommand(value: unknown): FrameCommand | undefined {
   return undefined;
 }
 
+const isBoolean = (value: unknown) => typeof value === "boolean";
+const isClockTime = (value: unknown) =>
+  typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+
+const SETTING_CHECKS: {
+  [K in keyof FrameSettings]: (value: unknown) => boolean;
+} = {
+  screenOn: isBoolean,
+  brightness: (value) => typeof value === "number" && value > 0 && value <= 1,
+  volume: (value) => typeof value === "number" && value >= 0 && value <= 1,
+  screensaver: isBoolean,
+  night: isBoolean,
+  nightStart: isClockTime,
+  nightEnd: isClockTime,
+  dark: isBoolean,
+  darkStart: isClockTime,
+  darkEnd: isClockTime,
+};
+
 function parseSettings(value: unknown): Partial<FrameSettings> | undefined {
   if (typeof value !== "object" || value === null) return undefined;
-  const {
-    screenOn,
-    brightness,
-    volume,
-    screensaver,
-    night,
-    nightStart,
-    nightEnd,
-    ...rest
-  } = value as Record<string, unknown>;
-  if (Object.keys(rest).length) return undefined;
-  const settings: Partial<FrameSettings> = {};
-  if (typeof screenOn === "boolean") settings.screenOn = screenOn;
-  else if (screenOn !== undefined) return undefined;
-  if (typeof brightness === "number" && brightness > 0 && brightness <= 1) {
-    settings.brightness = brightness;
-  } else if (brightness !== undefined) return undefined;
-  if (typeof volume === "number" && volume >= 0 && volume <= 1) {
-    settings.volume = volume;
-  } else if (volume !== undefined) return undefined;
-  if (typeof screensaver === "boolean") settings.screensaver = screensaver;
-  else if (screensaver !== undefined) return undefined;
-  if (typeof night === "boolean") settings.night = night;
-  else if (night !== undefined) return undefined;
-  if (typeof nightStart === "string" && CLOCK_TIME.test(nightStart)) {
-    settings.nightStart = nightStart;
-  } else if (nightStart !== undefined) return undefined;
-  if (typeof nightEnd === "string" && CLOCK_TIME.test(nightEnd)) {
-    settings.nightEnd = nightEnd;
-  } else if (nightEnd !== undefined) return undefined;
-  return Object.keys(settings).length ? settings : undefined;
+  const entries = Object.entries(value);
+  const valid = entries.every(
+    ([key, setting]) =>
+      Object.hasOwn(SETTING_CHECKS, key) &&
+      SETTING_CHECKS[key as keyof FrameSettings](setting),
+  );
+  return entries.length && valid ? Object.fromEntries(entries) : undefined;
 }

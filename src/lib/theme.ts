@@ -8,17 +8,18 @@ function currentTheme(): Theme {
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
+export function applyTheme(theme: Theme) {
+  if (theme === currentTheme()) return;
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("frame.theme", theme);
+  for (const listener of listeners) listener(theme);
+}
+
 export function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState(currentTheme);
   useEffect(() => {
     listeners.add(setTheme);
     return () => listeners.delete(setTheme);
   }, []);
-  const toggle = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem("frame.theme", next);
-    for (const listener of listeners) listener(next);
-  };
-  return [theme, toggle];
+  return [theme, () => applyTheme(theme === "dark" ? "light" : "dark")];
 }

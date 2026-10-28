@@ -3,7 +3,7 @@ set -eu
 
 usage() {
   echo "usage: pnpm frame [status | screen on|off | brightness 1-100 | volume 0-100" >&2
-  echo "                  | screensaver on|off | night on|off|HH:MM HH:MM | show calendar|music|weather|garden | reload | restart | screenshot]" >&2
+  echo "                  | screensaver on|off | night|dark on|off|HH:MM HH:MM | show calendar|music|weather|garden | reload | restart | screenshot]" >&2
   exit 2
 }
 
@@ -11,6 +11,19 @@ switch() {
   case "${2:-}" in
     on) body="{\"type\":\"set\",\"settings\":{\"$1\":true}}" ;;
     off) body="{\"type\":\"set\",\"settings\":{\"$1\":false}}" ;;
+    *) usage ;;
+  esac
+}
+
+schedule() {
+  case "$2" in
+    on | off) switch "$1" "$2" ;;
+    [0-2][0-9]:[0-5][0-9])
+      case "$3" in
+        [0-2][0-9]:[0-5][0-9]) ;;
+        *) usage ;;
+      esac
+      body="{\"type\":\"set\",\"settings\":{\"$1\":true,\"$1Start\":\"$2\",\"$1End\":\"$3\"}}" ;;
     *) usage ;;
   esac
 }
@@ -32,17 +45,7 @@ case "${1:-status}" in
   status) body= ;;
   screen) switch screenOn "${2:-}" ;;
   screensaver) switch screensaver "${2:-}" ;;
-  night)
-    case "${2:-}" in
-      on | off) switch night "$2" ;;
-      [0-2][0-9]:[0-5][0-9])
-        case "${3:-}" in
-          [0-2][0-9]:[0-5][0-9]) ;;
-          *) usage ;;
-        esac
-        body="{\"type\":\"set\",\"settings\":{\"night\":true,\"nightStart\":\"$2\",\"nightEnd\":\"$3\"}}" ;;
-      *) usage ;;
-    esac ;;
+  night | dark) schedule "$1" "${2:-}" "${3:-}" ;;
   brightness) percent brightness 1 "${2:-}" ;;
   volume) percent volume 0 "${2:-}" ;;
   restart) body='{"type":"restart"}' ;;

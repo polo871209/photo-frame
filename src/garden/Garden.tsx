@@ -7,7 +7,7 @@ import { colorsFor } from "./colors";
 const SEASON_KEY = "frame.season";
 const SEASONS: readonly Season[] = ["spring", "summer", "autumn", "winter"];
 
-export function Garden({ interactive }: { interactive: boolean }) {
+export function Garden({ controls }: { controls: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const garden = useRef<MountedGarden | null>(null);
   const [season, setSeason] = useState(savedSeason);
@@ -47,7 +47,7 @@ export function Garden({ interactive }: { interactive: boolean }) {
   return (
     <div class="garden" ref={host}>
       {failed && <p class="empty">The garden cannot load</p>}
-      {interactive && !failed && (
+      {controls && !failed && (
         <div class="garden-bar">
           <div class="seg">
             {SEASONS.map((value) => (

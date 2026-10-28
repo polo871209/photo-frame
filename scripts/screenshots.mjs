@@ -21,7 +21,7 @@ for (const theme of themes) {
 await browser.close();
 
 console.log(
-  `Wrote ${themes.length * (views.length + 8)} screenshots to ${outDir}`,
+  `Wrote ${themes.length * (views.length + 9)} screenshots to ${outDir}`,
 );
 if (errors.length) {
   console.error(errors.join("\n"));
@@ -102,6 +102,9 @@ async function shoot(theme) {
   await page.waitForSelector(".garden canvas");
   await page.waitForTimeout(4000);
   await page.screenshot({ path: path("Garden") });
+  await page.mouse.click(640, 720);
+  await page.waitForSelector(".garden-bar");
+  await page.screenshot({ path: path("GardenControls") });
   await page.click('.menu-screens [aria-label="Calendar"]');
   await page.close();
 }
