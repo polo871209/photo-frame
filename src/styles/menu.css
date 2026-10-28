@@ -62,3 +62,4 @@
 }
 .dev-action:active { background: var(--line); }
 .dev-action.is-on { background: var(--ink); color: var(--paper); }
+.dev-detail { font-size: 16px; font-weight: 700; font-family: var(--condensed); color: var(--mute); }

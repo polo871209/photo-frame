@@ -3,6 +3,7 @@ import { SCREEN_IDS, type ScreenId } from "../shared/control";
 import { Calendar } from "./calendar/Calendar";
 import { useFrameControl } from "./control/useFrameControl";
 import { Garden } from "./garden/Garden";
+import { Screensaver } from "./garden/Screensaver";
 import { isIdle } from "./lib/idle";
 import { prefetchThenReload } from "./lib/reload";
 import { Menu, type ScreenEntry } from "./menu/Menu";
@@ -33,7 +34,7 @@ export function App() {
     localStorage.setItem(SCREEN_KEY, id);
   };
   const control = useFrameControl(pick);
-  const { screenOn } = control.settings;
+  const { screenOn } = control;
   useEffect(() => {
     if (!control.buildChanged) return;
     const timer = setInterval(() => {
@@ -62,7 +63,7 @@ export function App() {
   return (
     <div class="stage" style={`transform:scale(${scale})`}>
       <main class="screen" hidden={screen !== "calendar"}>
-        <Calendar chimes={control.settings.chimes && screenOn} />
+        <Calendar />
       </main>
       {screen === "music" && (
         <main class="screen">
@@ -80,19 +81,9 @@ export function App() {
         </main>
       )}
       <Menu screens={SCREENS} screen={screen} onPick={pick} control={control} />
-      {saving && (
-        <div class="garden-saver" onClick={() => setSaving(false)}>
-          <Garden interactive={false} />
-        </div>
-      )}
+      {saving && <Screensaver onClose={() => setSaving(false)} />}
       {!screenOn && (
-        <button
-          class="sleep"
-          aria-label="Wake"
-          onClick={() =>
-            control.send({ type: "set", settings: { screenOn: true } })
-          }
-        />
+        <button class="sleep" aria-label="Wake" onClick={control.wake} />
       )}
     </div>
   );

@@ -58,8 +58,5 @@ export function title(view: ViewId, anchor: Date, range: VisibleRange): string {
   const last = addDays(range.end, -1);
   if (range.start.getMonth() === last.getMonth())
     return format.monthYear(range.start);
-  const sameYear = range.start.getFullYear() === last.getFullYear();
-  return sameYear
-    ? `${format.monthShort(range.start)} – ${format.monthShort(last)} ${last.getFullYear()}`
-    : `${format.monthShort(range.start)} ${range.start.getFullYear()} – ${format.monthShort(last)} ${last.getFullYear()}`;
+  return `${format.monthShort(range.start)} – ${format.monthShort(last)} ${last.getFullYear()}`;
 }

@@ -1,12 +1,14 @@
 .cal { height: 100%; display: flex; flex-direction: column; padding: 16px 24px 0; }
 .cal-head { display: flex; align-items: center; gap: 8px; height: var(--head-h); margin-bottom: 14px; flex: none; padding-right: calc(var(--menu-w) + 10px); }
-.cal-title { flex: 1; min-width: 0; margin-left: 8px; font-size: 34px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-heading { flex: 1; min-width: 0; margin-left: 8px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.cal-title { max-width: 100%; font-size: 34px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-head .btn { padding: 0 14px; }
 .cal-head .seg button { padding: 0 9px; }
 .cal-status {
-  flex: none; padding: 6px 12px; border-radius: 999px;
+  max-width: 100%; padding: 2px 8px; border-radius: 999px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   background: var(--paper-2); color: var(--ink-2);
-  font-size: 13px; font-weight: 800; font-family: var(--condensed); letter-spacing: .06em; text-transform: uppercase;
+  font-size: 12px; font-weight: 800; font-family: var(--condensed); letter-spacing: .06em; text-transform: uppercase;
 }
 .cal-status.is-error { background: var(--alert); color: var(--paper); }
 .cal-body { flex: 1; min-height: 0; position: relative; touch-action: pan-y; }

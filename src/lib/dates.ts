@@ -38,6 +38,11 @@ export function minutesIntoDay(date: Date): number {
   return date.getHours() * 60 + date.getMinutes();
 }
 
+export function minutesOfClockTime(time: string): number {
+  const [hours = 0, minutes = 0] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
 function formatter(options: Intl.DateTimeFormatOptions) {
   const format = new Intl.DateTimeFormat(undefined, options);
   return (date: Date) => format.format(date);

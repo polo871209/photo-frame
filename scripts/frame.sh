@@ -2,8 +2,8 @@
 set -eu
 
 usage() {
-  echo "usage: pnpm frame [status | screen on|off | brightness 1-100 | volume 0-100 | chimes on|off | chime" >&2
-  echo "                  | screensaver on|off | show calendar|music|weather|garden | reload | restart | screenshot]" >&2
+  echo "usage: pnpm frame [status | screen on|off | brightness 1-100 | volume 0-100" >&2
+  echo "                  | screensaver on|off | night on|off|HH:MM HH:MM | show calendar|music|weather|garden | reload | restart | screenshot]" >&2
   exit 2
 }
 
@@ -31,11 +31,20 @@ url="${FRAME_URL:-https://photoframe.lochingpo.com}/api/control"
 case "${1:-status}" in
   status) body= ;;
   screen) switch screenOn "${2:-}" ;;
-  chimes) switch chimes "${2:-}" ;;
   screensaver) switch screensaver "${2:-}" ;;
+  night)
+    case "${2:-}" in
+      on | off) switch night "$2" ;;
+      [0-2][0-9]:[0-5][0-9])
+        case "${3:-}" in
+          [0-2][0-9]:[0-5][0-9]) ;;
+          *) usage ;;
+        esac
+        body="{\"type\":\"set\",\"settings\":{\"night\":true,\"nightStart\":\"$2\",\"nightEnd\":\"$3\"}}" ;;
+      *) usage ;;
+    esac ;;
   brightness) percent brightness 1 "${2:-}" ;;
   volume) percent volume 0 "${2:-}" ;;
-  chime) body='{"type":"chime"}' ;;
   restart) body='{"type":"restart"}' ;;
   screenshot)
     out="$(dirname "$0")/../screenshots/frame-$(date +%Y%m%d-%H%M%S).jpg"

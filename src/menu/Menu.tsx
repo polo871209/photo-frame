@@ -2,8 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { FrameSettings, ScreenId } from "../../shared/control";
 import { restartKiosk, type FrameControl } from "../control/useFrameControl";
 import { Icon, type IconName } from "../icons";
-import { playChime } from "../lib/chime";
-import { clockParts } from "../lib/dates";
+import { clockParts, format, minutesOfClockTime } from "../lib/dates";
 import { useTheme } from "../lib/theme";
 import { useNow } from "../lib/useNow";
 
@@ -109,10 +108,7 @@ function DeviceSettings({
         min={0}
         value={settings.volume}
         onInput={(volume) => preview({ volume })}
-        onChange={(volume) => {
-          save({ volume });
-          playChime();
-        }}
+        onChange={(volume) => save({ volume })}
       />
       <div class="dev-group">
         <Toggle
@@ -122,16 +118,17 @@ function DeviceSettings({
           onToggle={toggleTheme}
         />
         <Toggle
-          icon="bell"
-          label="Event chimes"
-          on={settings.chimes}
-          onToggle={() => save({ chimes: !settings.chimes })}
-        />
-        <Toggle
           icon="tree"
           label="Screensaver"
           on={settings.screensaver}
           onToggle={() => save({ screensaver: !settings.screensaver })}
+        />
+        <Toggle
+          icon="power"
+          label="Off at night"
+          detail={`${clockTime(settings.nightStart)} – ${clockTime(settings.nightEnd)}`}
+          on={settings.night}
+          onToggle={() => save({ night: !settings.night })}
         />
       </div>
       <div class="dev-actions">
@@ -209,11 +206,13 @@ function Slider({
 function Toggle({
   icon,
   label,
+  detail,
   on,
   onToggle,
 }: {
   icon: IconName;
   label: string;
+  detail?: string;
   on: boolean;
   onToggle: () => void;
 }) {
@@ -221,7 +220,13 @@ function Toggle({
     <button class="dev-row dev-toggle" aria-pressed={on} onClick={onToggle}>
       <Icon name={icon} size={26} />
       <span class="dev-label">{label}</span>
+      {detail && <span class="dev-detail">{detail}</span>}
       <span class={`switch${on ? " is-on" : ""}`} />
     </button>
   );
+}
+
+function clockTime(time: string): string {
+  const date = new Date(2000, 0, 1, 0, minutesOfClockTime(time));
+  return date.getMinutes() ? format.time(date) : format.hour(date);
 }

@@ -10,7 +10,6 @@ import { useCalendarPrefs, withPrefs } from "./prefs";
 import { Schedule } from "./Schedule";
 import { SettingsSheet } from "./SettingsSheet";
 import { TimeGrid } from "./TimeGrid";
-import { useChimes } from "./useChimes";
 import { useEvents } from "./useEvents";
 import { step, title, VIEWS, visibleRange, type ViewId } from "./views";
 
@@ -18,7 +17,7 @@ const SWIPE_MIN_PX = 80;
 const SWIPE_MAX_DRIFT_PX = 60;
 const SWIPE_MAX_MS = 600;
 
-export function Calendar({ chimes }: { chimes: boolean }) {
+export function Calendar() {
   const now = useNow();
   const [prefs, setPrefs] = useCalendarPrefs();
   const [view, setView] = useState<ViewId>(prefs.homeView);
@@ -31,7 +30,6 @@ export function Calendar({ chimes }: { chimes: boolean }) {
     () => withPrefs(events.occurrences, prefs),
     [events.occurrences, prefs],
   );
-  useChimes(occurrences, now, chimes);
 
   const swipeStart = useRef<{ x: number; y: number; at: number } | null>(null);
   const ignoreTapsUntil = useRef(0);
@@ -94,12 +92,14 @@ export function Calendar({ chimes }: { chimes: boolean }) {
         <button class="icon-btn" aria-label="Next" onClick={() => navigate(1)}>
           <Icon name="right" />
         </button>
-        <h1 class="cal-title title">{title(view, anchor, range)}</h1>
-        <Status
-          source={events.source}
-          failed={events.failed}
-          error={events.error}
-        />
+        <div class="cal-heading">
+          <h1 class="cal-title title">{title(view, anchor, range)}</h1>
+          <Status
+            source={events.source}
+            failed={events.failed}
+            error={events.error}
+          />
+        </div>
         <div class="seg">
           {VIEWS.map(({ id, label }) => (
             <button

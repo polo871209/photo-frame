@@ -91,7 +91,6 @@ function scaled(hex: string, factor: number): string {
   return `#${channel(16)}${channel(8)}${channel(0)}`;
 }
 
-/** Muted tree colors and a Catppuccin ground, dimmed for the dark theme. */
 export function colorsFor(theme: Theme): Required<Colors> {
   const dim = (hex: string) => scaled(hex, theme === "dark" ? DARK_DIM : 1);
   const tree = (season: Season): TreeLook => {

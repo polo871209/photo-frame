@@ -14,18 +14,21 @@ const browser = await chromium.launch({
   args: ["--enable-unsafe-swiftshader"],
 });
 const errors = [];
-for (const theme of themes) await shoot(theme);
+for (const theme of themes) {
+  await shoot(theme);
+  await shootScreensaver(theme);
+}
 await browser.close();
 
 console.log(
-  `Wrote ${themes.length * (views.length + 7)} screenshots to ${outDir}`,
+  `Wrote ${themes.length * (views.length + 8)} screenshots to ${outDir}`,
 );
 if (errors.length) {
   console.error(errors.join("\n"));
   process.exit(1);
 }
 
-async function shoot(theme) {
+async function newPage() {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 800 },
     timezoneId: "Asia/Kuala_Lumpur",
@@ -34,6 +37,28 @@ async function shoot(theme) {
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
   });
+  return page;
+}
+
+async function shootScreensaver(theme) {
+  const page = await newPage();
+  await page.clock.install();
+  await page.addInitScript((theme) => {
+    localStorage.setItem("frame.theme", theme);
+  }, theme);
+  await page.goto(url);
+  await page.waitForSelector(".cal");
+  await page.clock.fastForward("03:10");
+  await page.clock.runFor(6000);
+  await page.waitForSelector(".garden-saver canvas");
+  await page.clock.runFor(4000);
+  await page.waitForTimeout(1000);
+  await page.screenshot({ path: `${outDir}${theme}-Screensaver.png` });
+  await page.close();
+}
+
+async function shoot(theme) {
+  const page = await newPage();
   const path = (name) => `${outDir}${theme}-${name}.png`;
 
   await page.goto(url);

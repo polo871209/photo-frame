@@ -25,7 +25,7 @@ type AirTone =
   | "very-unhealthy"
   | "hazardous";
 
-export interface AirBand {
+interface AirBand {
   upTo: number;
   tone: AirTone;
   label: string;

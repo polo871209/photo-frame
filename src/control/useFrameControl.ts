@@ -10,8 +10,10 @@ import {
   type FrameSettings,
   type ScreenId,
 } from "../../shared/control";
-import { playChime } from "../lib/chime";
+import { minutesIntoDay, minutesOfClockTime } from "../lib/dates";
+import { isIdle } from "../lib/idle";
 import { prefetchThenReload } from "../lib/reload";
+import { useNow } from "../lib/useNow";
 
 declare global {
   interface Window {
@@ -32,6 +34,9 @@ const SILENT_LIMIT_MS = HEARTBEAT_MS + 10_000;
 
 export interface FrameControl {
   settings: FrameSettings;
+  /** Whether the screen shows now: `settings.screenOn`, unless the night window has turned it off. */
+  screenOn: boolean;
+  wake: () => void;
   preview: (settings: Partial<FrameSettings>) => void;
   buildChanged: boolean;
   send: (command: FrameCommand) => void;
@@ -87,9 +92,6 @@ export function useFrameControl(
           case "restart":
             restartKiosk();
             break;
-          case "chime":
-            playChime();
-            break;
           case "screenshot":
             uploadScreenshot();
             break;
@@ -110,7 +112,24 @@ export function useFrameControl(
     };
   }, []);
 
-  const level = settings.screenOn ? settings.brightness : 0;
+  const now = useNow();
+  const night =
+    settings.night && inWindow(now, settings.nightStart, settings.nightEnd);
+  const [nightWake, setNightWake] = useState(false);
+  useEffect(() => {
+    if (!nightWake) return;
+    if (!night) {
+      setNightWake(false);
+      return;
+    }
+    const timer = setInterval(() => {
+      if (isIdle()) setNightWake(false);
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [night, nightWake]);
+  const screenOn = settings.screenOn && (!night || nightWake);
+
+  const level = screenOn ? settings.brightness : 0;
   useEffect(() => window.Kiosk?.setBrightness(level), [level]);
   useEffect(() => window.Kiosk?.setVolume(settings.volume), [settings.volume]);
 
@@ -124,7 +143,21 @@ export function useFrameControl(
     }
   };
 
-  return { settings, preview, buildChanged, send };
+  const wake = () => {
+    if (night) setNightWake(true);
+    if (!settings.screenOn) send({ type: "set", settings: { screenOn: true } });
+  };
+
+  return { settings, screenOn, wake, preview, buildChanged, send };
+}
+
+function inWindow(now: Date, start: string, end: string): boolean {
+  const minute = minutesIntoDay(now);
+  const from = minutesOfClockTime(start);
+  const to = minutesOfClockTime(end);
+  return from <= to
+    ? from <= minute && minute < to
+    : minute >= from || minute < to;
 }
 
 export function restartKiosk() {
