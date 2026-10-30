@@ -8,7 +8,7 @@ export interface FrameSettings {
   brightness: number;
   /** Media volume. 0 mutes it, and 1 is the maximum. */
   volume: number;
-  /** Show the garden after a while with no touch, on every screen but music. */
+  /** Show the garden after a while with no touch, and on the music screen only while Spotify does not play. */
   screensaver: boolean;
   /** Turn the screen off every night from `nightStart` to `nightEnd`, both `HH:MM` in the frame's local time. A tap wakes it until the frame is idle again. */
   night: boolean;

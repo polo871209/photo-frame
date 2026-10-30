@@ -1,10 +1,10 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { SCREEN_IDS, type ScreenId } from "../shared/control";
 import { Calendar } from "./calendar/Calendar";
 import { useFrameControl } from "./control/useFrameControl";
 import { Garden } from "./garden/Garden";
 import { SaverInfo, Screensaver } from "./garden/Screensaver";
-import { isIdle } from "./lib/idle";
+import { IDLE_MS, isIdle } from "./lib/idle";
 import { prefetchThenReload } from "./lib/reload";
 import { Menu, type ScreenEntry } from "./menu/Menu";
 import { NowPlaying } from "./music/NowPlaying";
@@ -45,22 +45,31 @@ export function App() {
     return () => clearInterval(timer);
   }, [control.buildChanged, screenOn]);
 
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const musicStoppedAt = useRef(Date.now());
+  const onMusicPlaying = (playing: boolean) => {
+    if (!playing) musicStoppedAt.current = Date.now();
+    setMusicPlaying(playing);
+  };
+
   const [saving, setSaving] = useState(false);
   const canSave =
     control.settings.screensaver &&
     screenOn &&
-    screen !== "music" &&
-    screen !== "garden";
+    screen !== "garden" &&
+    !(screen === "music" && musicPlaying);
   useEffect(() => {
     if (!canSave) {
       setSaving(false);
       return;
     }
     const timer = setInterval(() => {
-      if (isIdle()) setSaving(true);
+      const musicIdle =
+        screen !== "music" || Date.now() - musicStoppedAt.current >= IDLE_MS;
+      if (isIdle() && musicIdle) setSaving(true);
     }, 5_000);
     return () => clearInterval(timer);
-  }, [canSave]);
+  }, [canSave, screen]);
 
   useEffect(() => {
     if (!gardenControls) return;
@@ -78,7 +87,7 @@ export function App() {
       </main>
       {screen === "music" && (
         <main class="screen">
-          <NowPlaying />
+          <NowPlaying onPlayingChange={onMusicPlaying} />
         </main>
       )}
       {screen === "weather" && (

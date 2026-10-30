@@ -13,7 +13,11 @@ import { useLyrics } from "./useLyrics";
 const COMMAND_ERROR_MS = 6_000;
 const CONTROL_ICON_PX = 22;
 
-export function NowPlaying() {
+export function NowPlaying({
+  onPlayingChange,
+}: {
+  onPlayingChange: (playing: boolean) => void;
+}) {
   const { data, receivedAt, error, refresh } = useNowPlaying();
   const [picking, togglePicking] = useSavedToggle("frame.picker");
   const [commandError, setCommandError] = useState<string>();
@@ -22,6 +26,7 @@ export function NowPlaying() {
   const playing = !!(data?.playing && track);
   const lyrics = useLyrics(track?.uri, lyricsOn);
   useSecondTick(playing);
+  useEffect(() => onPlayingChange(playing), [playing]);
 
   useEffect(() => {
     if (!commandError) return;
